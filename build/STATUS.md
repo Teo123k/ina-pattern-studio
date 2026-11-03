@@ -9,8 +9,8 @@ Allowed states: TODO, READY, IN_PROGRESS, NEEDS_REVIEW, BLOCKED_ON_INPUT, DONE. 
 | [01](tickets/01.md) | Strict confirmed measurements | None | DONE |
 | [02](tickets/02.md) | Version-bound validation | 01 | DONE |
 | [03](tickets/03.md) | Atomic persistence/concurrency | 02 | DONE |
-| [04](tickets/04.md) | Verified actor and approvals | 03 | READY |
-| [05](tickets/05.md) | Telegram intake/navigation | 04 | TODO |
+| [04](tickets/04.md) | Verified actor and approvals | 03 | DONE |
+| [05](tickets/05.md) | Telegram intake/navigation | 04 | READY |
 | [06](tickets/06.md) | Jobs and operations | 05 | TODO |
 | [07](tickets/07.md) | Materials and frame | 06 | TODO |
 | [08](tickets/08.md) | Design concepts | 07 | TODO |
@@ -79,3 +79,12 @@ Mock / real integration / physical evidence: Unit tests cover uncertain commit h
 Commit (if created): pending.
 Remaining gate or decision: Ticket 04 must bind approval assertions to verified actor identity.
 Next ready ticket: 04.
+
+Ticket 04 / 2026-11-03:
+Implementation outcome: Replaced model-provided approval fields with expiring, one-time approval challenges bound to the owner Telegram account, owner chat, project, operation and exact payload hash. A trusted gateway callback verifies a secret-derived callback signature before marking a challenge approved; the subsequent mutation consumes it exactly once. Release-gate inspection is now read-only. The runtime requires a separate callback secret in production.
+Files changed: project record, tool contracts, tool service, HTTP gateway callback route, runtime configuration, and unit/integration tests.
+Checks actually executed and results: `npm test` — 29 passed, 0 failed, 1 integration test skipped without a database URL; `INA_TEST_DATABASE_URL=postgres://ina@127.0.0.1:54340/ina_pattern_studio_test npm run test:integration` — 1 passed, 0 failed, 0 skipped after migrations ran in a disposable local cluster; `git diff --check` — clean.
+Mock / real integration / physical evidence: Tests cover forged actor, mismatched edited measurements, replayed approval and PostgreSQL persistence/concurrency. No live Telegram callback was invoked because the configured Hermes gateway is external to this repository.
+Commit (if created): pending.
+Remaining gate or decision: Gateway deployment must provide `SERVICE_API_KEY` and `TELEGRAM_APPROVAL_SECRET` when it calls the protected callback endpoint.
+Next ready ticket: 05.

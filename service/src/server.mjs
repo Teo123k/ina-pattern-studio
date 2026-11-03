@@ -12,8 +12,9 @@ const port = Number(process.env.PORT ?? 3030);
 const mediaDir = resolve(process.env.LOCAL_MEDIA_DIR ?? "service/.local-media");
 const allowedTelegramIds = (process.env.ALLOWED_TELEGRAM_IDS ?? "").split(",").map((item) => item.trim()).filter(Boolean);
 const apiKey = process.env.SERVICE_API_KEY;
-if (process.env.NODE_ENV === "production" && (!apiKey || allowedTelegramIds.length === 0)) {
-  throw new Error("SERVICE_API_KEY and ALLOWED_TELEGRAM_IDS are required in production.");
+const approvalSecret = process.env.TELEGRAM_APPROVAL_SECRET;
+if (process.env.NODE_ENV === "production" && (!apiKey || !approvalSecret || allowedTelegramIds.length === 0)) {
+  throw new Error("SERVICE_API_KEY, TELEGRAM_APPROVAL_SECRET and ALLOWED_TELEGRAM_IDS are required in production.");
 }
 if (process.env.NODE_ENV === "production" && (!process.env.DATABASE_URL || process.env.OBJECT_STORAGE_DRIVER !== "s3")) {
   throw new Error("DATABASE_URL and OBJECT_STORAGE_DRIVER=s3 are required in production.");
@@ -29,7 +30,7 @@ const objectStore = process.env.OBJECT_STORAGE_DRIVER === "s3"
       secretAccessKey: process.env.S3_SECRET_ACCESS_KEY
     })
   : new LocalObjectStore(mediaDir);
-const service = new InaToolService({ repository, objectStore, allowedTelegramIds });
+const service = new InaToolService({ repository, objectStore, allowedTelegramIds, approvalSecret });
 
 function send(response, status, body) {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8" });
@@ -46,6 +47,11 @@ async function bodyOf(request) {
 const server = createServer(async (request, response) => {
   try {
     if (request.method === "GET" && request.url === "/health") return send(response, 200, { ok: true });
+    if (request.method === "POST" && request.url === "/v1/gateway/telegram-callback") {
+      if (!apiKey || request.headers.authorization !== `Bearer ${apiKey}`) return send(response, 401, { error: { code: "unauthorized" } });
+      const result = await service.approve_gateway_callback(await bodyOf(request));
+      return send(response, 200, { ok: true, result });
+    }
     if (request.method !== "POST" || !request.url?.startsWith("/v1/tools/")) return send(response, 404, { error: { code: "not_found" } });
     if (apiKey && request.headers.authorization !== `Bearer ${apiKey}`) return send(response, 401, { error: { code: "unauthorized" } });
     const toolName = decodeURIComponent(request.url.slice("/v1/tools/".length));

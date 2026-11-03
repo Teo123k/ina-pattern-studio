@@ -17,6 +17,7 @@ async function makeService() {
     repository: new PostgresRepository(connectionString),
     objectStore: new LocalObjectStore(await mkdtemp(join(tmpdir(), "ina-postgres-test-"))),
     allowedTelegramIds: ["101"],
+    approvalSecret: "test-approval-secret",
     now: () => "2026-11-03T10:00:00.000Z"
   });
 }
@@ -60,7 +61,12 @@ test("PostgreSQL intake is atomic and versioned under concurrent deliveries", { 
     assert.deepEqual(await counts(pool), { projects: 1, assets: 1, events: 1, audit: 1 });
 
     const measurement = { project_id: created.project_id, expected_measurement_version: 0, measurement_version: 1, confirmed_by: "ivana", confirmed_values: { diameterCm: 30, heightCm: 20, fittingDescription: "frame", yarnIdentity: "cotton", hookMm: 4, gaugeStitchesPer10Cm: 14, gaugeRowsPer10Cm: 10, motifRepeatStitches: 12 } };
-    const updates = await Promise.allSettled([first.call("save_measurements", measurement), second.call("save_measurements", measurement)]);
+    const prepared = await first.call("prepare_approval", { project_id: created.project_id, operation: "confirm_measurements", subject: { project_id: created.project_id, expected_measurement_version: 0, measurement_version: 1, confirmed_values: measurement.confirmed_values } });
+    await first.approve_gateway_callback({ project_id: created.project_id, callback_data: prepared.callback_data, actor_id: "101", chat_id: "chat-101" });
+    const updates = await Promise.allSettled([
+      first.call("save_measurements", { ...measurement, approval_id: prepared.approval_id }),
+      second.call("save_measurements", { ...measurement, approval_id: prepared.approval_id })
+    ]);
     assert.equal(updates.filter((result) => result.status === "fulfilled").length, 1);
     assert.equal(updates.filter((result) => result.status === "rejected" && ["concurrent_update", "measurement_version_conflict"].includes(result.reason.code)).length, 1);
 
@@ -68,7 +74,7 @@ test("PostgreSQL intake is atomic and versioned under concurrent deliveries", { 
     const restarted = new PostgresRepository(connectionString);
     const persisted = await restarted.getProject(created.project_id);
     assert.equal(persisted.measurements.version, 1);
-    assert.equal(persisted.revision, 1);
+    assert.equal(persisted.revision, 3);
     await restarted.close();
   } finally {
     await second.repository.close();

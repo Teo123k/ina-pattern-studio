@@ -13,6 +13,7 @@ async function makeService() {
     repository: new MemoryRepository(),
     objectStore: new LocalObjectStore(await mkdtemp(join(tmpdir(), "ina-tool-service-"))),
     allowedTelegramIds: ["101"],
+    approvalSecret: "test-approval-secret",
     now: () => "2026-11-03T10:00:00.000Z"
   });
 }
@@ -24,22 +25,25 @@ async function createProject(service) {
 }
 
 async function confirmMeasurements(service, projectId, { expectedVersion = 0, measurementVersion = 1, values = {} } = {}) {
+  const confirmed_values = {
+    diameterCm: 30,
+    heightCm: 20,
+    fittingDescription: "standard drum frame",
+    yarnIdentity: "cotton DK",
+    hookMm: 4,
+    gaugeStitchesPer10Cm: 14,
+    gaugeRowsPer10Cm: 10,
+    motifRepeatStitches: 12,
+    ...values
+  };
+  const approval = await service.call("prepare_approval", { project_id: projectId, operation: "confirm_measurements", subject: { project_id: projectId, expected_measurement_version: expectedVersion, measurement_version: measurementVersion, confirmed_values } });
+  await service.approve_gateway_callback({ project_id: projectId, callback_data: approval.callback_data, actor_id: "101", chat_id: "chat-101" });
   return service.call("save_measurements", {
     project_id: projectId,
     expected_measurement_version: expectedVersion,
     measurement_version: measurementVersion,
-    confirmed_by: "ivana",
-    confirmed_values: {
-      diameterCm: 30,
-      heightCm: 20,
-      fittingDescription: "standard drum frame",
-      yarnIdentity: "cotton DK",
-      hookMm: 4,
-      gaugeStitchesPer10Cm: 14,
-      gaugeRowsPer10Cm: 10,
-      motifRepeatStitches: 12,
-      ...values
-    }
+    approval_id: approval.approval_id,
+    confirmed_values
   });
 }
 
@@ -50,6 +54,18 @@ test("creates an internal project and deduplicates Telegram delivery", async () 
   assert.match(first.project_id, /^INA-\d+$/);
   assert.equal(second.duplicate, true);
   assert.equal(second.project_id, first.project_id);
+});
+
+test("consumes only one verified owner approval for the exact action", async () => {
+  const service = await makeService();
+  const project = await createProject(service);
+  const values = { diameterCm: 30, heightCm: 20, fittingDescription: "frame", yarnIdentity: "cotton", hookMm: 4, gaugeStitchesPer10Cm: 14, gaugeRowsPer10Cm: 10, motifRepeatStitches: 12 };
+  const prepared = await service.call("prepare_approval", { project_id: project.project_id, operation: "confirm_measurements", subject: { project_id: project.project_id, expected_measurement_version: 0, measurement_version: 1, confirmed_values: values } });
+  await assert.rejects(() => service.approve_gateway_callback({ project_id: project.project_id, callback_data: prepared.callback_data, actor_id: "999", chat_id: "chat-101" }), { code: "approval_actor_mismatch" });
+  await service.approve_gateway_callback({ project_id: project.project_id, callback_data: prepared.callback_data, actor_id: "101", chat_id: "chat-101" });
+  await assert.rejects(() => service.call("save_measurements", { project_id: project.project_id, expected_measurement_version: 0, measurement_version: 1, confirmed_values: { ...values, heightCm: 21 }, approval_id: prepared.approval_id }), { code: "approval_mismatch" });
+  await service.call("save_measurements", { project_id: project.project_id, expected_measurement_version: 0, measurement_version: 1, confirmed_values: values, approval_id: prepared.approval_id });
+  await assert.rejects(() => service.call("save_measurements", { project_id: project.project_id, expected_measurement_version: 1, measurement_version: 2, confirmed_values: values, approval_id: prepared.approval_id }), { code: "approval_required" });
 });
 
 test("stores provided measurements as unconfirmed and reports missing height", async () => {

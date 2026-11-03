@@ -1,19 +1,20 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto";
 import { ToolError, TransactionOutcomeUnknownError, requireValue } from "../domain/errors.mjs";
 import { assertPatternCanBeSaved, compactProject, createProject, releaseGate, validateConstruction } from "../domain/project.mjs";
 import { measurementFieldNames, parseConfirmedMeasurements, parseConstructionValidation, parseIntakeMeasurements } from "../contracts/measurement-schema.mjs";
 
 const allowedTools = new Set([
-  "create_project_from_telegram", "get_project", "save_measurements", "find_material_options", "save_material_selection", "validate_pattern", "save_pattern_draft", "create_tester_pack", "record_tester_feedback", "check_release_gate", "create_etsy_draft"
+  "create_project_from_telegram", "get_project", "prepare_approval", "save_measurements", "find_material_options", "save_material_selection", "validate_pattern", "save_pattern_draft", "create_tester_pack", "record_tester_feedback", "check_release_gate", "create_etsy_draft"
 ]);
 
 export class InaToolService {
-  constructor({ repository, objectStore, allowedTelegramIds = [], now = () => new Date().toISOString(), etsyEnabled = false }) {
+  constructor({ repository, objectStore, allowedTelegramIds = [], now = () => new Date().toISOString(), etsyEnabled = false, approvalSecret }) {
     this.repository = repository;
     this.objectStore = objectStore;
     this.allowedTelegramIds = new Set(allowedTelegramIds.map(String));
     this.now = now;
     this.etsyEnabled = etsyEnabled;
+    this.approvalSecret = approvalSecret ?? null;
   }
 
   async call(toolName, input) {
@@ -40,7 +41,7 @@ export class InaToolService {
         const stored = await this.objectStore.store({ projectId, messageId: message_id, kind: attachment.kind, contentBase64: attachment.content_base64 });
         storedAssets.push({ id: randomUUID(), projectId, messageId: String(message_id), kind: attachment.kind, ...stored, createdAt: now });
       }
-      const project = createProject({ projectId, ownerTelegramId: sender_id, text, attachments: storedAssets, measurements: parsedMeasurements, now });
+      const project = createProject({ projectId, ownerTelegramId: sender_id, ownerChatId: chat_id, text, attachments: storedAssets, measurements: parsedMeasurements, now });
       const missingFields = measurementFieldNames.filter((key) => parsedMeasurements[key] === undefined);
       const result = {
         project_id: projectId,
@@ -78,12 +79,38 @@ export class InaToolService {
     return compactProject(await this.repository.getProject(project_id));
   }
 
-  async save_measurements({ project_id, expected_measurement_version, measurement_version, confirmed_values, confirmed_by }) {
+  async prepare_approval({ project_id, operation, subject }) {
+    requireValue(this.approvalSecret, "approval_not_configured", "Approval callbacks are not configured.", undefined);
     const project = await this.repository.getProject(project_id);
-    requireValue(confirmed_by === "ivana", "approval_required", "Measurements must be confirmed by Ivana.", { confirmed_by });
+    requireValue(["confirm_measurements", "select_material", "create_tester_pack", "approve_release"].includes(operation), "invalid_approval_operation", "This action cannot be confirmed through an approval callback.");
+    const subjectHash = hash(subject);
+    const challenge = { id: randomUUID(), operation, subjectHash, actorId: project.ownerTelegramId, chatId: project.ownerChatId, expiresAt: new Date(Date.parse(this.now()) + 15 * 60_000).toISOString(), status: "pending", createdAt: this.now() };
+    project.approvalChallenges = [...(project.approvalChallenges ?? []), challenge];
+    await this.repository.saveProject(project, "approval_prepared", "system");
+    return { project_id, approval_id: challenge.id, expires_at: challenge.expiresAt, callback_data: callbackData(project_id, challenge.id, this.approvalSecret), next_allowed_action: "Ivana must confirm this exact action in Telegram." };
+  }
+
+  async approve_gateway_callback({ project_id, callback_data, actor_id, chat_id }) {
+    requireValue(this.approvalSecret, "approval_not_configured", "Approval callbacks are not configured.");
+    const project = await this.repository.getProject(project_id);
+    const challengeId = verifiedCallbackId(project_id, callback_data, this.approvalSecret);
+    const challenge = project.approvalChallenges?.find((item) => item.id === challengeId);
+    requireValue(challenge, "approval_not_found", "Approval request was not found.");
+    requireValue(challenge.status === "pending", "approval_replayed", "Approval request has already been used.");
+    requireValue(Date.parse(challenge.expiresAt) >= Date.parse(this.now()), "approval_expired", "Approval request has expired.");
+    requireValue(String(actor_id) === project.ownerTelegramId && String(chat_id) === project.ownerChatId, "approval_actor_mismatch", "Only Ivana can confirm this project action.");
+    challenge.status = "approved";
+    challenge.approvedAt = this.now();
+    await this.repository.saveProject(project, "approval_confirmed", String(actor_id));
+    return { project_id, approval_id: challenge.id, operation: challenge.operation, approved: true };
+  }
+
+  async save_measurements({ project_id, expected_measurement_version, measurement_version, confirmed_values, approval_id }) {
+    const project = await this.repository.getProject(project_id);
     requireValue(expected_measurement_version === project.measurements.version, "measurement_version_conflict", "expected_measurement_version must match the current version.", { expected: project.measurements.version });
     requireValue(measurement_version === project.measurements.version + 1, "measurement_version_conflict", "measurement_version must be exactly one greater than the current version.", { expected: project.measurements.version + 1 });
     const parsedMeasurements = parseConfirmedMeasurements(confirmed_values);
+    consumeApproval(project, approval_id, "confirm_measurements", { project_id, expected_measurement_version, measurement_version, confirmed_values }, this.now());
     const confirmedAt = this.now();
     const measurementRecord = { version: measurement_version, status: "CONFIRMED", confirmed: true, values: structuredClone(parsedMeasurements), confirmedBy: "ivana", confirmedAt };
     project.measurements = { ...measurementRecord, history: [...(project.measurements.history ?? []), structuredClone(measurementRecord)] };
@@ -100,9 +127,9 @@ export class InaToolService {
     return { project_id, state: project.state, options: await this.repository.listMaterials(), next_allowed_action: "Ivana selects a recorded material option or adds source-backed material data." };
   }
 
-  async save_material_selection({ project_id, material_option_id, approved_by }) {
+  async save_material_selection({ project_id, material_option_id, approval_id }) {
     const project = await this.repository.getProject(project_id);
-    requireValue(approved_by === "ivana", "approval_required", "Material selection requires Ivana approval.");
+    consumeApproval(project, approval_id, "select_material", { project_id, material_option_id }, this.now());
     const materials = await this.repository.listMaterials();
     const option = materials.find((material) => material.id === material_option_id);
     requireValue(option, "material_not_found", "Material option was not found.");
@@ -133,9 +160,9 @@ export class InaToolService {
     return compactProject(project);
   }
 
-  async create_tester_pack({ project_id, pattern_version, approved_by }) {
+  async create_tester_pack({ project_id, pattern_version, approval_id }) {
     const project = await this.repository.getProject(project_id);
-    requireValue(approved_by === "ivana", "approval_required", "Tester pack requires Ivana approval of the draft.");
+    consumeApproval(project, approval_id, "create_tester_pack", { project_id, pattern_version }, this.now());
     requireValue(project.patterns.some((pattern) => pattern.version === pattern_version), "pattern_not_found", "Pattern version was not found.");
     project.state = "prototype";
     await this.repository.saveProject(project, "tester_pack_created", "ivana");
@@ -154,15 +181,10 @@ export class InaToolService {
     return compactProject(project);
   }
 
-  async check_release_gate({ project_id, pattern_version, ivana_approval = false, final_pdf_path = null, etsy_draft_reviewed = false }) {
+  async check_release_gate({ project_id, pattern_version }) {
     const project = await this.repository.getProject(project_id);
     requireValue(project.patterns.some((pattern) => pattern.version === pattern_version), "pattern_not_found", "Pattern version was not found.");
-    if (ivana_approval === true) project.release.ivanaApproval = true;
-    if (final_pdf_path) project.release.finalPdfPath = final_pdf_path;
-    if (etsy_draft_reviewed === true) project.release.etsyDraftReviewed = true;
     const gate = releaseGate(project);
-    if (gate.valid) project.state = "approved";
-    await this.repository.saveProject(project, gate.valid ? "release_approved" : "release_blocked", "ivana");
     return { project_id, pattern_version, state: project.state, ...gate, next_allowed_action: gate.valid ? "Create a reviewable Etsy digital draft." : "Provide the missing release evidence." };
   }
 
@@ -177,6 +199,33 @@ export class InaToolService {
     await this.repository.saveProject(project, "etsy_draft_created", "system");
     return { project_id, pattern_version, state: project.state, etsy_state: "draft", next_allowed_action: "Ivana reviews the Etsy draft. Publication is unavailable." };
   }
+}
+
+function hash(value) {
+  return createHash("sha256").update(JSON.stringify(value)).digest("hex");
+}
+
+function callbackData(projectId, challengeId, secret) {
+  const signature = createHmac("sha256", secret).update(`${projectId}:${challengeId}`).digest("hex").slice(0, 24);
+  return `ina:${challengeId}:${signature}`;
+}
+
+function verifiedCallbackId(projectId, callbackDataValue, secret) {
+  const match = /^ina:([0-9a-f-]{36}):([0-9a-f]{24})$/.exec(callbackDataValue ?? "");
+  requireValue(match, "invalid_approval_callback", "Approval callback is invalid.");
+  const expected = callbackData(projectId, match[1], secret);
+  requireValue(timingSafeEqual(Buffer.from(expected), Buffer.from(callbackDataValue)), "invalid_approval_callback", "Approval callback is invalid.");
+  return match[1];
+}
+
+function consumeApproval(project, approvalId, operation, subject, now) {
+  const challenge = project.approvalChallenges?.find((item) => item.id === approvalId);
+  requireValue(challenge, "approval_required", "A verified Ivana approval is required.");
+  requireValue(challenge.status === "approved", "approval_required", "A verified Ivana approval is required.");
+  requireValue(challenge.operation === operation && challenge.subjectHash === hash(subject), "approval_mismatch", "Approval does not match this exact action.");
+  requireValue(Date.parse(challenge.expiresAt) >= Date.parse(now), "approval_expired", "Approval request has expired.");
+  challenge.status = "consumed";
+  challenge.consumedAt = now;
 }
 
 async function removeStagedAssets(objectStore, assets) {

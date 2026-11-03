@@ -23,6 +23,7 @@ test("MCP server exposes exactly the approved INA tools", async () => {
       "create_tester_pack",
       "find_material_options",
       "get_project",
+      "prepare_approval",
       "record_tester_feedback",
       "save_material_selection",
       "save_measurements",

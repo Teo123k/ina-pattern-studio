@@ -7,6 +7,7 @@ const attachment = z.object({
 });
 
 const record = z.record(z.string(), z.unknown());
+const approval = z.object({ approval_id: z.string().uuid() });
 
 export const toolDefinitions = [
   {
@@ -15,16 +16,17 @@ export const toolDefinitions = [
     schema: { bot_id: z.string().min(1), chat_id: z.string().min(1), message_id: z.string().min(1), sender_id: z.string().min(1), text: z.string().optional(), attachments: z.array(attachment).min(1), measurements: intakeMeasurementsSchema.optional() }
   },
   { name: "get_project", description: "Return the compact current context for one INA project.", schema: { project_id: z.string().regex(/^INA-\d+$/) } },
+  { name: "prepare_approval", description: "Prepare a one-time Ivana Telegram confirmation for an exact project action. This does not approve or execute the action.", schema: { project_id: z.string().regex(/^INA-\d+$/), operation: z.enum(["confirm_measurements", "select_material", "create_tester_pack", "approve_release"]), subject: record } },
   {
     name: "save_measurements",
     description: "Save Ivana-confirmed construction measurements as the next immutable version.",
-    schema: { project_id: z.string().regex(/^INA-\d+$/), expected_measurement_version: z.number().int().nonnegative(), measurement_version: z.number().int().positive(), confirmed_values: confirmedMeasurementsSchema, confirmed_by: z.literal("ivana") }
+    schema: { project_id: z.string().regex(/^INA-\d+$/), expected_measurement_version: z.number().int().nonnegative(), measurement_version: z.number().int().positive(), confirmed_values: confirmedMeasurementsSchema, approval_id: approval.shape.approval_id }
   },
   { name: "find_material_options", description: "List source-backed material options for a project.", schema: { project_id: z.string().regex(/^INA-\d+$/) } },
   {
     name: "save_material_selection",
     description: "Record Ivana's selection of an existing material option.",
-    schema: { project_id: z.string().regex(/^INA-\d+$/), material_option_id: z.string().min(1), approved_by: z.literal("ivana") }
+    schema: { project_id: z.string().regex(/^INA-\d+$/), material_option_id: z.string().min(1), approval_id: approval.shape.approval_id }
   },
   {
     name: "validate_pattern",
@@ -39,7 +41,7 @@ export const toolDefinitions = [
   {
     name: "create_tester_pack",
     description: "Create a tester-pack record only after Ivana approves the draft version.",
-    schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/), approved_by: z.literal("ivana") }
+    schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/), approval_id: approval.shape.approval_id }
   },
   {
     name: "record_tester_feedback",
@@ -49,7 +51,7 @@ export const toolDefinitions = [
   {
     name: "check_release_gate",
     description: "Evaluate release evidence and report exactly what remains blocked.",
-    schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/), ivana_approval: z.boolean().optional(), final_pdf_path: z.string().optional(), etsy_draft_reviewed: z.boolean().optional() }
+    schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/) }
   },
   {
     name: "create_etsy_draft",

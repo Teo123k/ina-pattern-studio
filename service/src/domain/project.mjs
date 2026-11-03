@@ -6,12 +6,13 @@ export const PROJECT_STATES = new Set([
   "brief", "construction", "pattern_draft", "prototype", "tester_review", "release_candidate", "approved", "etsy_draft_created"
 ]);
 
-export function createProject({ projectId, ownerTelegramId, text, attachments, measurements = {}, now }) {
+export function createProject({ projectId, ownerTelegramId, ownerChatId, text, attachments, measurements = {}, now }) {
   return {
     id: projectId,
     revision: 0,
     state: "brief",
     ownerTelegramId: String(ownerTelegramId),
+    ownerChatId: String(ownerChatId),
     createdAt: now,
     updatedAt: now,
     source: { text: text ?? "", attachments },
@@ -23,6 +24,7 @@ export function createProject({ projectId, ownerTelegramId, text, attachments, m
     testing: { prototypeCount: 0, testerCount: 0, criticalIssuesOpen: 0 },
     release: { ivanaApproval: false, finalPdfPath: null, etsyDraftReviewed: false },
     audit: []
+    ,approvalChallenges: []
   };
 }
 
