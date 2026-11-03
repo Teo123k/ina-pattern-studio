@@ -47,6 +47,10 @@ async function confirmMeasurements(service, projectId, { expectedVersion = 0, me
   });
 }
 
+function validPatternDraft() {
+  return { title: "First lampshade", frame: { diameterCm: 30, heightCm: 20, fittingDescription: "standard drum frame" }, materials: { yarn: "cotton DK", hookMm: 4, gauge: "14 stitches x 10 rows" }, repeat: { stitches: 12, count: 10 }, rows: [{ number: 1, instruction: "Ch 2, work 12 dc around.", stitchCount: 12, operations: ["ch", "dc"] }], finishing: "Fasten off and weave in ends." };
+}
+
 test("creates an internal project and deduplicates Telegram delivery", async () => {
   const service = await makeService();
   const first = await createProject(service);
@@ -241,7 +245,7 @@ test("rejects an incompatible stitch repeat and permits a valid pattern draft", 
   await confirmMeasurements(service, project.project_id, { expectedVersion: 1, measurementVersion: 2, values: { motifRepeatStitches: 12 } });
   const passed = await service.call("validate_pattern", { project_id: project.project_id, construction_spec: { measurementVersion: 2, fitTolerancePercent: 3 } });
   assert.equal(passed.valid, true);
-  const saved = await service.call("save_pattern_draft", { project_id: project.project_id, pattern_version: "1.0", validation_id: passed.validation_id, draft: { title: "First lampshade", steps: [] } });
+  const saved = await service.call("save_pattern_draft", { project_id: project.project_id, pattern_version: "1.0", validation_id: passed.validation_id, draft: validPatternDraft() });
   assert.equal(saved.currentPattern.status, "not_for_sale");
 });
 
@@ -250,7 +254,7 @@ test("holds release and Etsy draft creation until all evidence is present", asyn
   const project = await createProject(service);
   await confirmMeasurements(service, project.project_id);
   const validation = await service.call("validate_pattern", { project_id: project.project_id, construction_spec: { measurementVersion: 1, fitTolerancePercent: 3 } });
-  await service.call("save_pattern_draft", { project_id: project.project_id, pattern_version: "1.0", validation_id: validation.validation_id, draft: { steps: [] } });
+  await service.call("save_pattern_draft", { project_id: project.project_id, pattern_version: "1.0", validation_id: validation.validation_id, draft: validPatternDraft() });
   const blocked = await service.call("check_release_gate", { project_id: project.project_id, pattern_version: "1.0" });
   assert.equal(blocked.valid, false);
   await assert.rejects(() => service.call("create_etsy_draft", { project_id: project.project_id, pattern_version: "1.0", listing_payload: { type: "download" } }), { code: "release_gate_blocked" });
@@ -281,7 +285,7 @@ test("binds validations and pattern drafts to the current immutable measurement 
   assert.equal(afterChange.measurements.history[0].values.heightCm, 20);
   assert.equal(afterChange.latestValidation, null);
   await assert.rejects(
-    () => service.call("save_pattern_draft", { project_id: project.project_id, pattern_version: "1.0", validation_id: versionOneValidation.validation_id, draft: { steps: [] } }),
+    () => service.call("save_pattern_draft", { project_id: project.project_id, pattern_version: "1.0", validation_id: versionOneValidation.validation_id, draft: validPatternDraft() }),
     { code: "validation_required" }
   );
   await assert.rejects(

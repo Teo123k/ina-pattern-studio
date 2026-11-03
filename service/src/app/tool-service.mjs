@@ -3,6 +3,7 @@ import { ToolError, TransactionOutcomeUnknownError, requireValue } from "../doma
 import { assertPatternCanBeSaved, compactProject, createProject, releaseGate, validateConstruction } from "../domain/project.mjs";
 import { measurementFieldNames, parseConfirmedMeasurements, parseConstructionValidation, parseIntakeMeasurements } from "../contracts/measurement-schema.mjs";
 import { MockConceptAdapter } from "../adapters/concept-adapter.mjs";
+import { validateStructuredPattern } from "../../../agent/tools/validate-structured-pattern.mjs";
 
 const allowedTools = new Set([
     "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "select_concept", "validate_pattern", "save_pattern_draft", "create_tester_pack", "record_tester_feedback", "check_release_gate", "create_etsy_draft"
@@ -216,8 +217,8 @@ export class InaToolService {
   async save_pattern_draft({ project_id, pattern_version, validation_id, draft }) {
     const project = await this.repository.getProject(project_id);
     assertPatternCanBeSaved(project, pattern_version, validation_id);
-    requireValue(draft && typeof draft === "object", "invalid_pattern_draft", "A structured pattern draft is required.");
-    project.patterns.push({ version: pattern_version, status: "not_for_sale", validationId: validation_id, measurementVersion: project.measurements.version, draft: structuredClone(draft), createdAt: this.now() });
+    const validatedDraft = validateStructuredPattern(draft);
+    project.patterns.push({ version: pattern_version, status: "not_for_sale", validationId: validation_id, measurementVersion: project.measurements.version, draft: validatedDraft, createdAt: this.now() });
     project.state = "pattern_draft";
     await this.repository.saveProject(project, "pattern_draft_saved", "system");
     return compactProject(project);

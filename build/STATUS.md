@@ -14,8 +14,8 @@ Allowed states: TODO, READY, IN_PROGRESS, NEEDS_REVIEW, BLOCKED_ON_INPUT, DONE. 
 | [06](tickets/06.md) | Jobs and operations | 05 | DONE |
 | [07](tickets/07.md) | Materials and frame | 06 | DONE |
 | [08](tickets/08.md) | Design concepts | 07 | DONE |
-| [09](tickets/09.md) | Structured pattern generation | 08 | READY |
-| [10](tickets/10.md) | PDF and making guidance | 09 | TODO |
+| [09](tickets/09.md) | Structured pattern generation | 08 | DONE |
+| [10](tickets/10.md) | PDF and making guidance | 09 | READY |
 | [11](tickets/11.md) | Physical tests/release | 10 | TODO |
 | [12](tickets/12.md) | Content packages | 11 | TODO |
 | [13](tickets/13.md) | Video render | 12 | TODO |
@@ -124,3 +124,12 @@ Mock / real integration / physical evidence: Mock adapter tests cover prerequisi
 Commit (if created): pending.
 Remaining gate or decision: Ticket 09 adds the structured pattern contract and deterministic construction checks.
 Next ready ticket: 09.
+
+Ticket 09 / 2026-11-03:
+Implementation outcome: Added a structured not-for-sale pattern contract and validator for one supported crochet construction family. It requires frame/material data, positive repeat metadata, numbered non-empty rows, stitch totals, supported operations and finishing instructions. Invalid counts, empty rows and unsupported techniques fail before persistence.
+Files changed: structured pattern validator, service draft save path, test command and fixtures.
+Checks actually executed and results: `npm test` — 37 passed, 0 failed, 1 skipped without a database URL; `git diff --check` — clean.
+Mock / real integration / physical evidence: Known-good and deliberately invalid structured fixtures pass/fail as expected. No physical verification is claimed.
+Commit (if created): pending.
+Remaining gate or decision: Ticket 10 renders the structured draft into a versioned PDF and making guidance.
+Next ready ticket: 10.
