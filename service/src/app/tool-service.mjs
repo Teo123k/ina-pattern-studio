@@ -3,10 +3,11 @@ import { ToolError, TransactionOutcomeUnknownError, requireValue } from "../doma
 import { assertPatternCanBeSaved, compactProject, createProject, releaseGate, validateConstruction } from "../domain/project.mjs";
 import { measurementFieldNames, parseConfirmedMeasurements, parseConstructionValidation, parseIntakeMeasurements } from "../contracts/measurement-schema.mjs";
 import { MockConceptAdapter } from "../adapters/concept-adapter.mjs";
+import { renderPatternPdf } from "../render/pattern-pdf.mjs";
 import { validateStructuredPattern } from "../../../agent/tools/validate-structured-pattern.mjs";
 
 const allowedTools = new Set([
-    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "select_concept", "validate_pattern", "save_pattern_draft", "create_tester_pack", "record_tester_feedback", "check_release_gate", "create_etsy_draft"
+    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "select_concept", "validate_pattern", "save_pattern_draft", "render_pattern_pdf", "get_pattern_pdf", "create_tester_pack", "record_tester_feedback", "check_release_gate", "create_etsy_draft"
 ]);
 
 export class InaToolService {
@@ -222,6 +223,25 @@ export class InaToolService {
     project.state = "pattern_draft";
     await this.repository.saveProject(project, "pattern_draft_saved", "system");
     return compactProject(project);
+  }
+
+  async render_pattern_pdf({ project_id, pattern_version }) {
+    const project = await this.repository.getProject(project_id);
+    const pattern = project.patterns.find((item) => item.version === pattern_version);
+    requireValue(pattern, "pattern_not_found", "Pattern version was not found.");
+    const bytes = renderPatternPdf({ project, pattern });
+    const stored = await this.objectStore.store({ projectId: project_id, messageId: `pattern-${pattern_version}`, kind: "pdf", contentBase64: bytes.toString("base64") });
+    pattern.pdfPath = stored.storageKey; pattern.pdfChecksum = stored.checksum; pattern.artifactLabel = "TESTER DRAFT";
+    await this.repository.saveProject(project, "pattern_pdf_rendered", "system");
+    return { project_id, pattern_version, artifact_path: stored.storageKey, checksum: stored.checksum, label: "TESTER DRAFT", next_allowed_action: "Download the tester draft and report corrections." };
+  }
+
+  async get_pattern_pdf({ project_id, pattern_version }) {
+    const project = await this.repository.getProject(project_id);
+    const pattern = project.patterns.find((item) => item.version === pattern_version);
+    requireValue(pattern?.pdfPath, "pattern_pdf_not_found", "Render the pattern PDF before retrieving it.");
+    requireValue(typeof this.objectStore.read === "function", "artifact_retrieval_unavailable", "Artifact retrieval is not configured.");
+    return { project_id, pattern_version, content_base64: (await this.objectStore.read(pattern.pdfPath)).toString("base64"), checksum: pattern.pdfChecksum, label: pattern.artifactLabel };
   }
 
   async create_tester_pack({ project_id, pattern_version, approval_id }) {

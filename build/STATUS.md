@@ -15,8 +15,8 @@ Allowed states: TODO, READY, IN_PROGRESS, NEEDS_REVIEW, BLOCKED_ON_INPUT, DONE. 
 | [07](tickets/07.md) | Materials and frame | 06 | DONE |
 | [08](tickets/08.md) | Design concepts | 07 | DONE |
 | [09](tickets/09.md) | Structured pattern generation | 08 | DONE |
-| [10](tickets/10.md) | PDF and making guidance | 09 | READY |
-| [11](tickets/11.md) | Physical tests/release | 10 | TODO |
+| [10](tickets/10.md) | PDF and making guidance | 09 | DONE |
+| [11](tickets/11.md) | Physical tests/release | 10 | READY |
 | [12](tickets/12.md) | Content packages | 11 | TODO |
 | [13](tickets/13.md) | Video render | 12 | TODO |
 | [14](tickets/14.md) | Real Etsy drafts | 12 | TODO |
@@ -133,3 +133,12 @@ Mock / real integration / physical evidence: Known-good and deliberately invalid
 Commit (if created): pending.
 Remaining gate or decision: Ticket 10 renders the structured draft into a versioned PDF and making guidance.
 Next ready ticket: 10.
+
+Ticket 10 / 2026-11-03:
+Implementation outcome: Added deterministic versioned tester PDF rendering from structured pattern data, with frame/material details, numbered rows, finishing instructions, project/version metadata and explicit not-for-sale draft language. Added artifact retrieval through the object-store adapter.
+Files changed: PDF renderer, local artifact read path, service tools/contracts, tests and build status.
+Checks actually executed and results: `npm test` — 38 passed, 0 failed, 1 skipped without a database URL; `git diff --check` — clean.
+Mock / real integration / physical evidence: PDF header, retrieval and tester-label tests pass. Full-page visual inspection and multi-page clipping review require a PDF renderer/viewer not installed in this environment; no physical pattern claim is made.
+Commit (if created): pending.
+Remaining gate or decision: Ticket 11 replaces aggregate testing counters with version-bound maker/tester evidence and release approval.
+Next ready ticket: 11.

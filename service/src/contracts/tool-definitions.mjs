@@ -47,6 +47,8 @@ export const toolDefinitions = [
     description: "Save a validator-approved, not-for-sale pattern draft.",
     schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/), validation_id: z.string().uuid(), draft: record }
   },
+  { name: "render_pattern_pdf", description: "Render a versioned tester PDF from a structured not-for-sale pattern draft.", schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/) } },
+  { name: "get_pattern_pdf", description: "Retrieve the rendered tester PDF artifact for a fixed pattern version.", schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/) } },
   {
     name: "create_tester_pack",
     description: "Create a tester-pack record only after Ivana approves the draft version.",

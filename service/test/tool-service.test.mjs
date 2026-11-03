@@ -117,6 +117,19 @@ test("generates constrained concept illustrations and requires verified selectio
   assert.equal(selected.selectedConcept.conceptId, "concept-1");
 });
 
+test("renders and retrieves a labelled tester PDF artifact", async () => {
+  const service = await makeService();
+  const project = await createProject(service);
+  await confirmMeasurements(service, project.project_id);
+  const validation = await service.call("validate_pattern", { project_id: project.project_id, construction_spec: { measurementVersion: 1, fitTolerancePercent: 3 } });
+  await service.call("save_pattern_draft", { project_id: project.project_id, pattern_version: "1.0", validation_id: validation.validation_id, draft: validPatternDraft() });
+  const rendered = await service.call("render_pattern_pdf", { project_id: project.project_id, pattern_version: "1.0" });
+  assert.equal(rendered.label, "TESTER DRAFT");
+  const artifact = await service.call("get_pattern_pdf", { project_id: project.project_id, pattern_version: "1.0" });
+  assert.equal(artifact.label, "TESTER DRAFT");
+  assert.equal(Buffer.from(artifact.content_base64, "base64").subarray(0, 8).toString(), "%PDF-1.4");
+});
+
 test("consumes only one verified owner approval for the exact action", async () => {
   const service = await makeService();
   const project = await createProject(service);

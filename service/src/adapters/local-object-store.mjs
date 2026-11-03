@@ -1,4 +1,4 @@
-import { mkdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { createHash, randomUUID } from "node:crypto";
 
@@ -22,5 +22,11 @@ export class LocalObjectStore {
     const absolutePath = resolve(this.rootDirectory, storageKey);
     if (!absolutePath.startsWith(`${this.rootDirectory}/`)) throw new Error("Invalid object-storage key.");
     await rm(absolutePath, { force: true });
+  }
+
+  async read(storageKey) {
+    const absolutePath = resolve(this.rootDirectory, storageKey);
+    if (!absolutePath.startsWith(`${this.rootDirectory}/`)) throw new Error("Invalid object-storage key.");
+    return readFile(absolutePath);
   }
 }
