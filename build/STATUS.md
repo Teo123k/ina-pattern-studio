@@ -205,3 +205,12 @@ Mock / real integration / physical evidence: Mock HTTP tests cover draft-to-publ
 Commit (if created): pending.
 Remaining gate or decision: Create the free WordPress.com site, then provide its numeric site ID and OAuth token only through deployment secrets. A real approved draft/publication test is required before this ticket can be marked DONE.
 Next ready ticket: Ticket 17 remains IN_PROGRESS; its usage meter must be made durable and wired to the real worker/provider.
+
+Ticket 05 live-intake follow-up / 2026-11-03:
+Implementation outcome: Added a direct Telegram Bot API gateway for authenticated `/new` photo/sketch/PDF/video intake. The webhook checks Telegram's configured secret, uses the existing allowlist before downloading media, creates the project through the existing atomic service path, and replies with the stored project status. Ordinary chat is ignored rather than interpreted as a project action.
+Files changed: Telegram Bot API adapter, gateway handler/tests, HTTP route, environment example and test script.
+Checks actually executed and results: `npm test` — 50 passed, 0 failed, 1 skipped without a database URL; `node --check service/src/server.mjs` — passed; `git diff --check` — clean.
+Mock / real integration / physical evidence: Unit tests use a mock Telegram API. No bot token, webhook URL or live Telegram delivery was configured.
+Commit (if created): pending.
+Remaining gate or decision: Deployment must set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, allowlisted Telegram IDs, service API secret, PostgreSQL and S3 storage, then register the HTTPS webhook. The button-led maker flow and model provider are separate next work.
+Next ready ticket: Ticket 17 remains IN_PROGRESS.

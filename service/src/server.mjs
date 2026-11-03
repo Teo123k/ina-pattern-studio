@@ -8,6 +8,8 @@ import { LocalObjectStore } from "./adapters/local-object-store.mjs";
 import { S3ObjectStore } from "./adapters/s3-object-store.mjs";
 import { EtsyAdapter } from "./adapters/etsy-adapter.mjs";
 import { WordPressAdapter } from "./adapters/wordpress-adapter.mjs";
+import { TelegramBotAdapter } from "./adapters/telegram-bot-adapter.mjs";
+import { handleTelegramUpdate } from "./telegram/gateway.mjs";
 import { ToolError } from "./domain/errors.mjs";
 
 const port = Number(process.env.PORT ?? 3030);
@@ -15,6 +17,7 @@ const mediaDir = resolve(process.env.LOCAL_MEDIA_DIR ?? "service/.local-media");
 const allowedTelegramIds = (process.env.ALLOWED_TELEGRAM_IDS ?? "").split(",").map((item) => item.trim()).filter(Boolean);
 const apiKey = process.env.SERVICE_API_KEY;
 const approvalSecret = process.env.TELEGRAM_APPROVAL_SECRET;
+const telegramWebhookSecret = process.env.TELEGRAM_WEBHOOK_SECRET;
 const MAX_BODY_BYTES = 1024 * 1024;
 if (process.env.NODE_ENV === "production" && (!apiKey || !approvalSecret || allowedTelegramIds.length === 0)) {
   throw new Error("SERVICE_API_KEY, TELEGRAM_APPROVAL_SECRET and ALLOWED_TELEGRAM_IDS are required in production.");
@@ -40,6 +43,7 @@ const wordpressAdapter = process.env.WORDPRESS_SITE_ID && process.env.WORDPRESS_
   ? new WordPressAdapter({ siteId: process.env.WORDPRESS_SITE_ID, accessToken: process.env.WORDPRESS_ACCESS_TOKEN })
   : null;
 const service = new InaToolService({ repository, objectStore, allowedTelegramIds, approvalSecret, etsyEnabled: Boolean(etsyAdapter), etsyAdapter, wordpressEnabled: Boolean(wordpressAdapter), wordpressAdapter });
+const telegram = process.env.TELEGRAM_BOT_TOKEN ? new TelegramBotAdapter({ token: process.env.TELEGRAM_BOT_TOKEN }) : null;
 
 function send(response, status, body) {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8" });
@@ -64,6 +68,11 @@ const server = createServer(async (request, response) => {
     if (request.method === "POST" && request.url === "/v1/gateway/telegram-callback") {
       if (!apiKey || request.headers.authorization !== `Bearer ${apiKey}`) return send(response, 401, { error: { code: "unauthorized" } });
       const result = await service.approve_gateway_callback(await bodyOf(request));
+      return send(response, 200, { ok: true, result });
+    }
+    if (request.method === "POST" && request.url === "/v1/gateway/telegram-update") {
+      if (!telegram || !telegramWebhookSecret || request.headers["x-telegram-bot-api-secret-token"] !== telegramWebhookSecret) return send(response, 401, { error: { code: "unauthorized" } });
+      const result = await handleTelegramUpdate({ update: await bodyOf(request), service, telegram, allowedTelegramIds });
       return send(response, 200, { ok: true, result });
     }
     if (request.method !== "POST" || !request.url?.startsWith("/v1/tools/")) return send(response, 404, { error: { code: "not_found" } });

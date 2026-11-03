@@ -7,7 +7,7 @@
     "start": "node --env-file-if-exists=service/.env service/src/server.mjs",
     "dev": "node --env-file-if-exists=service/.env --watch service/src/server.mjs",
     "mcp": "node service/src/mcp-server.mjs",
-    "test": "node --test agent/tools/validate-pattern.test.mjs agent/tools/validate-structured-pattern.test.mjs service/src/video/edit-decision.test.mjs service/src/adapters/etsy-adapter.test.mjs service/src/adapters/wordpress-adapter.test.mjs service/src/usage/usage-meter.test.mjs tools/build-project-context.test.mjs service/test/**/*.test.mjs",
+    "test": "node --test agent/tools/validate-pattern.test.mjs agent/tools/validate-structured-pattern.test.mjs service/src/video/edit-decision.test.mjs service/src/adapters/etsy-adapter.test.mjs service/src/adapters/wordpress-adapter.test.mjs service/src/usage/usage-meter.test.mjs service/src/telegram/gateway.test.mjs tools/build-project-context.test.mjs service/test/**/*.test.mjs",
     "migrate": "node service/src/migrate.mjs",
     "test:integration": "node --test service/test/**/*.integration.test.mjs"
   },
