@@ -29,6 +29,7 @@ export const toolDefinitions = [
     schema: { project_id: z.string().regex(/^INA-\d+$/), expected_measurement_version: z.number().int().nonnegative(), measurement_version: z.number().int().positive(), confirmed_values: confirmedMeasurementsSchema, approval_id: approval.shape.approval_id }
   },
   { name: "find_material_options", description: "List source-backed material options for a project.", schema: { project_id: z.string().regex(/^INA-\d+$/) } },
+  { name: "add_material_option", description: "Store a source-backed material option with checked facts and prototype observations.", schema: { id: z.string().min(1), supplier: z.string().min(1), product: z.string().min(1), source_url: z.string().url(), checked_at: z.string().min(1), fibre: z.string().min(1), grams_per_ball: z.number().positive(), metres_per_ball: z.number().positive(), hook_guidance: z.string().min(1), cost: z.number().nonnegative(), currency: z.string().length(3), availability: z.string().min(1), prototype_observations: z.string().optional() } },
   {
     name: "save_material_selection",
     description: "Record Ivana's selection of an existing material option.",

@@ -80,6 +80,22 @@ test("deduplicates jobs and supports retry and cancellation", async () => {
   assert.equal((await service.call("cancel_job", { job_id: claimed.id })).status, "cancelled");
 });
 
+test("returns an honest empty material library and invalidates validation after a new selection", async () => {
+  const service = await makeService();
+  const project = await createProject(service);
+  const empty = await service.call("find_material_options", { project_id: project.project_id });
+  assert.equal(empty.options.length, 0);
+  assert.match(empty.next_allowed_action, /No source-backed/);
+  await service.call("add_material_option", { id: "cotton-dk", supplier: "Example Mill", product: "Cotton DK", source_url: "https://example.com/cotton-dk", checked_at: "2026-11-03", fibre: "100% cotton", grams_per_ball: 100, metres_per_ball: 240, hook_guidance: "3.5-4 mm", cost: 8, currency: "GBP", availability: "recorded", prototype_observations: "Awaiting Ivana swatch." });
+  const options = await service.call("find_material_options", { project_id: project.project_id });
+  assert.equal(options.options.length, 1);
+  const approval = await service.call("prepare_approval", { project_id: project.project_id, operation: "select_material", subject: { project_id: project.project_id, material_option_id: "cotton-dk" } });
+  await service.approve_gateway_callback({ project_id: project.project_id, callback_data: approval.callback_data, actor_id: "101", chat_id: "chat-101" });
+  const selected = await service.call("save_material_selection", { project_id: project.project_id, material_option_id: "cotton-dk", approval_id: approval.approval_id });
+  assert.equal(selected.material.id, "cotton-dk");
+  assert.equal(selected.latestValidation, null);
+});
+
 test("consumes only one verified owner approval for the exact action", async () => {
   const service = await makeService();
   const project = await createProject(service);

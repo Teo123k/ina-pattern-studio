@@ -4,7 +4,7 @@ import { assertPatternCanBeSaved, compactProject, createProject, releaseGate, va
 import { measurementFieldNames, parseConfirmedMeasurements, parseConstructionValidation, parseIntakeMeasurements } from "../contracts/measurement-schema.mjs";
 
 const allowedTools = new Set([
-  "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "save_material_selection", "validate_pattern", "save_pattern_draft", "create_tester_pack", "record_tester_feedback", "check_release_gate", "create_etsy_draft"
+    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "add_material_option", "save_material_selection", "validate_pattern", "save_pattern_draft", "create_tester_pack", "record_tester_feedback", "check_release_gate", "create_etsy_draft"
 ]);
 
 export class InaToolService {
@@ -151,7 +151,14 @@ export class InaToolService {
 
   async find_material_options({ project_id }) {
     const project = await this.repository.getProject(project_id);
-    return { project_id, state: project.state, options: await this.repository.listMaterials(), next_allowed_action: "Ivana selects a recorded material option or adds source-backed material data." };
+    const options = (await this.repository.listMaterials()).slice(0, 3);
+    return { project_id, state: project.state, options, next_allowed_action: options.length ? "Ivana selects a recorded material option or adds source-backed material data." : "No source-backed materials are recorded yet. Add a yarn source and check it before selecting." };
+  }
+
+  async add_material_option(input) {
+    const material = { id: input.id, supplier: input.supplier, product: input.product, sourceUrl: input.source_url, sourceCheckedAt: input.checked_at, fibre: input.fibre, gramsPerBall: input.grams_per_ball, metresPerBall: input.metres_per_ball, hookGuidance: input.hook_guidance, cost: input.cost, currency: input.currency, availability: input.availability, prototypeObservations: input.prototype_observations ?? null, evidenceStatus: "source_recorded" };
+    await this.repository.addMaterial(material);
+    return material;
   }
 
   async save_material_selection({ project_id, material_option_id, approval_id }) {
@@ -160,7 +167,12 @@ export class InaToolService {
     const materials = await this.repository.listMaterials();
     const option = materials.find((material) => material.id === material_option_id);
     requireValue(option, "material_not_found", "Material option was not found.");
-    project.material = { id: option.id, selectedBy: "ivana", selectedAt: this.now() };
+    const changedMaterial = project.material?.id !== option.id;
+    project.material = { id: option.id, version: option.sourceCheckedAt ?? option.source_checked_at, snapshot: structuredClone(option), selectedBy: "ivana", selectedAt: this.now() };
+    if (changedMaterial) {
+      project.latestValidation = null;
+      project.release = { ivanaApproval: false, finalPdfPath: null, etsyDraftReviewed: false };
+    }
     await this.repository.saveProject(project, "material_selected", "ivana");
     return compactProject(project);
   }
