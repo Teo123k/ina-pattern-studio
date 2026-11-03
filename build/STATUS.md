@@ -13,8 +13,8 @@ Allowed states: TODO, READY, IN_PROGRESS, NEEDS_REVIEW, BLOCKED_ON_INPUT, DONE. 
 | [05](tickets/05.md) | Telegram intake/navigation | 04 | DONE |
 | [06](tickets/06.md) | Jobs and operations | 05 | DONE |
 | [07](tickets/07.md) | Materials and frame | 06 | DONE |
-| [08](tickets/08.md) | Design concepts | 07 | READY |
-| [09](tickets/09.md) | Structured pattern generation | 08 | TODO |
+| [08](tickets/08.md) | Design concepts | 07 | DONE |
+| [09](tickets/09.md) | Structured pattern generation | 08 | READY |
 | [10](tickets/10.md) | PDF and making guidance | 09 | TODO |
 | [11](tickets/11.md) | Physical tests/release | 10 | TODO |
 | [12](tickets/12.md) | Content packages | 11 | TODO |
@@ -115,3 +115,12 @@ Mock / real integration / physical evidence: In-memory tests cover empty-library
 Commit (if created): pending.
 Remaining gate or decision: Ticket 08 adds constrained design concepts after material/frame context exists.
 Next ready ticket: 08.
+
+Ticket 08 / 2026-11-03:
+Implementation outcome: Added a constrained concept adapter with deterministic mock output, provenance and skill-level requirements, explicit cost/provider metadata, concept version storage and verified concept selection. Concept illustrations are labelled as visual references and contain no measured stitch claims.
+Files changed: concept adapter, project state, approval operation, tool contracts/service and tests.
+Checks actually executed and results: `npm test` — 35 passed, 0 failed, 1 skipped without a database URL; `git diff --check` — clean.
+Mock / real integration / physical evidence: Mock adapter tests cover prerequisites, three concepts, visual-only labels and verified selection. No provider smoke test or physical evidence was used.
+Commit (if created): pending.
+Remaining gate or decision: Ticket 09 adds the structured pattern contract and deterministic construction checks.
+Next ready ticket: 09.

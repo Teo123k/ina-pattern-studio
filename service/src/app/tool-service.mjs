@@ -2,19 +2,21 @@ import { createHash, createHmac, randomUUID, timingSafeEqual } from "node:crypto
 import { ToolError, TransactionOutcomeUnknownError, requireValue } from "../domain/errors.mjs";
 import { assertPatternCanBeSaved, compactProject, createProject, releaseGate, validateConstruction } from "../domain/project.mjs";
 import { measurementFieldNames, parseConfirmedMeasurements, parseConstructionValidation, parseIntakeMeasurements } from "../contracts/measurement-schema.mjs";
+import { MockConceptAdapter } from "../adapters/concept-adapter.mjs";
 
 const allowedTools = new Set([
-    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "add_material_option", "save_material_selection", "validate_pattern", "save_pattern_draft", "create_tester_pack", "record_tester_feedback", "check_release_gate", "create_etsy_draft"
+    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "select_concept", "validate_pattern", "save_pattern_draft", "create_tester_pack", "record_tester_feedback", "check_release_gate", "create_etsy_draft"
 ]);
 
 export class InaToolService {
-  constructor({ repository, objectStore, allowedTelegramIds = [], now = () => new Date().toISOString(), etsyEnabled = false, approvalSecret }) {
+  constructor({ repository, objectStore, allowedTelegramIds = [], now = () => new Date().toISOString(), etsyEnabled = false, approvalSecret, conceptAdapter = new MockConceptAdapter({ now }) }) {
     this.repository = repository;
     this.objectStore = objectStore;
     this.allowedTelegramIds = new Set(allowedTelegramIds.map(String));
     this.now = now;
     this.etsyEnabled = etsyEnabled;
     this.approvalSecret = approvalSecret ?? null;
+    this.conceptAdapter = conceptAdapter;
   }
 
   async call(toolName, input) {
@@ -109,7 +111,7 @@ export class InaToolService {
   async prepare_approval({ project_id, operation, subject }) {
     requireValue(this.approvalSecret, "approval_not_configured", "Approval callbacks are not configured.", undefined);
     const project = await this.repository.getProject(project_id);
-    requireValue(["confirm_measurements", "select_material", "create_tester_pack", "approve_release"].includes(operation), "invalid_approval_operation", "This action cannot be confirmed through an approval callback.");
+    requireValue(["confirm_measurements", "select_material", "select_concept", "create_tester_pack", "approve_release"].includes(operation), "invalid_approval_operation", "This action cannot be confirmed through an approval callback.");
     const subjectHash = hash(subject);
     const challenge = { id: randomUUID(), operation, subjectHash, actorId: project.ownerTelegramId, chatId: project.ownerChatId, expiresAt: new Date(Date.parse(this.now()) + 15 * 60_000).toISOString(), status: "pending", createdAt: this.now() };
     project.approvalChallenges = [...(project.approvalChallenges ?? []), challenge];
@@ -159,6 +161,28 @@ export class InaToolService {
     const material = { id: input.id, supplier: input.supplier, product: input.product, sourceUrl: input.source_url, sourceCheckedAt: input.checked_at, fibre: input.fibre, gramsPerBall: input.grams_per_ball, metresPerBall: input.metres_per_ball, hookGuidance: input.hook_guidance, cost: input.cost, currency: input.currency, availability: input.availability, prototypeObservations: input.prototype_observations ?? null, evidenceStatus: "source_recorded" };
     await this.repository.addMaterial(material);
     return material;
+  }
+
+  async generate_concepts({ project_id, provenance, skill_level, visual_direction, avoid = [] }) {
+    const project = await this.repository.getProject(project_id);
+    requireValue(project.measurements?.confirmed, "needs_measurement", "Confirm measurements before generating concepts.");
+    requireValue(project.material?.snapshot, "needs_material", "Select a source-backed material before generating concepts.");
+    const generated = await this.conceptAdapter.generate({ brief: { projectId: project_id, provenance, skillLevel: skill_level, visualDirection: visual_direction, avoid, frame: project.measurements.values, material: project.material.snapshot } });
+    project.concepts = [...(project.concepts ?? []), { version: (project.concepts?.length ?? 0) + 1, provenance, skillLevel: skill_level, visualDirection: visual_direction, generated, createdAt: this.now() }];
+    project.state = "concept_review";
+    await this.repository.saveProject(project, "concepts_generated", "system");
+    return { project_id, state: project.state, concept_version: project.concepts.at(-1).version, ...generated, next_allowed_action: "Ivana selects one concept for construction." };
+  }
+
+  async select_concept({ project_id, concept_id, approval_id }) {
+    const project = await this.repository.getProject(project_id);
+    const version = project.concepts?.at(-1);
+    requireValue(version?.generated?.concepts?.some((concept) => concept.id === concept_id), "concept_not_found", "Concept was not found in the current concept version.");
+    consumeApproval(project, approval_id, "select_concept", { project_id, concept_id }, this.now());
+    project.selectedConcept = { version: version.version, conceptId: concept_id, selectedAt: this.now(), status: "verified" };
+    project.state = "construction";
+    await this.repository.saveProject(project, "concept_selected", "ivana");
+    return compactProject(project);
   }
 
   async save_material_selection({ project_id, material_option_id, approval_id }) {

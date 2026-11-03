@@ -96,6 +96,23 @@ test("returns an honest empty material library and invalidates validation after 
   assert.equal(selected.latestValidation, null);
 });
 
+test("generates constrained concept illustrations and requires verified selection", async () => {
+  const service = await makeService();
+  const project = await createProject(service);
+  await confirmMeasurements(service, project.project_id);
+  await service.call("add_material_option", { id: "cotton-dk", supplier: "Example Mill", product: "Cotton DK", source_url: "https://example.com/cotton-dk", checked_at: "2026-11-03", fibre: "100% cotton", grams_per_ball: 100, metres_per_ball: 240, hook_guidance: "3.5-4 mm", cost: 8, currency: "GBP", availability: "recorded" });
+  const materialApproval = await service.call("prepare_approval", { project_id: project.project_id, operation: "select_material", subject: { project_id: project.project_id, material_option_id: "cotton-dk" } });
+  await service.approve_gateway_callback({ project_id: project.project_id, callback_data: materialApproval.callback_data, actor_id: "101", chat_id: "chat-101" });
+  await service.call("save_material_selection", { project_id: project.project_id, material_option_id: "cotton-dk", approval_id: materialApproval.approval_id });
+  const generated = await service.call("generate_concepts", { project_id: project.project_id, provenance: { is_original: true, notes: "This is Ivana's original direction for a new lampshade." }, skill_level: "confident_beginner", visual_direction: "Soft open texture with a calm handmade studio look.", avoid: ["dense solid fabric"] });
+  assert.equal(generated.concepts.length, 3);
+  assert.equal(generated.concepts[0].imagePath, null);
+  const approval = await service.call("prepare_approval", { project_id: project.project_id, operation: "select_concept", subject: { project_id: project.project_id, concept_id: "concept-1" } });
+  await service.approve_gateway_callback({ project_id: project.project_id, callback_data: approval.callback_data, actor_id: "101", chat_id: "chat-101" });
+  const selected = await service.call("select_concept", { project_id: project.project_id, concept_id: "concept-1", approval_id: approval.approval_id });
+  assert.equal(selected.selectedConcept.conceptId, "concept-1");
+});
+
 test("consumes only one verified owner approval for the exact action", async () => {
   const service = await makeService();
   const project = await createProject(service);

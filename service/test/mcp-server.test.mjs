@@ -25,6 +25,7 @@ test("MCP server exposes exactly the approved INA tools", async () => {
       "create_tester_pack",
       "enqueue_job",
       "find_material_options",
+      "generate_concepts",
       "get_job",
       "get_project",
       "list_projects",
@@ -34,6 +35,7 @@ test("MCP server exposes exactly the approved INA tools", async () => {
       "save_material_selection",
       "save_measurements",
       "save_pattern_draft",
+      "select_concept",
       "select_project",
       "validate_pattern"
     ]);
