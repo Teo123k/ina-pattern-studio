@@ -6,6 +6,7 @@ import { MemoryRepository } from "./adapters/memory-repository.mjs";
 import { PostgresRepository } from "./adapters/postgres-repository.mjs";
 import { LocalObjectStore } from "./adapters/local-object-store.mjs";
 import { S3ObjectStore } from "./adapters/s3-object-store.mjs";
+import { EtsyAdapter } from "./adapters/etsy-adapter.mjs";
 import { ToolError } from "./domain/errors.mjs";
 
 const port = Number(process.env.PORT ?? 3030);
@@ -31,7 +32,10 @@ const objectStore = process.env.OBJECT_STORAGE_DRIVER === "s3"
       secretAccessKey: process.env.S3_SECRET_ACCESS_KEY
     })
   : new LocalObjectStore(mediaDir);
-const service = new InaToolService({ repository, objectStore, allowedTelegramIds, approvalSecret });
+const etsyAdapter = process.env.ETSY_SHOP_ID && process.env.ETSY_API_KEY && process.env.ETSY_API_SECRET && process.env.ETSY_ACCESS_TOKEN
+  ? new EtsyAdapter({ shopId: process.env.ETSY_SHOP_ID, apiKey: process.env.ETSY_API_KEY, apiSecret: process.env.ETSY_API_SECRET, accessToken: process.env.ETSY_ACCESS_TOKEN })
+  : null;
+const service = new InaToolService({ repository, objectStore, allowedTelegramIds, approvalSecret, etsyEnabled: Boolean(etsyAdapter), etsyAdapter });
 
 function send(response, status, body) {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8" });

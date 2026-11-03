@@ -19,8 +19,8 @@ Allowed states: TODO, READY, IN_PROGRESS, NEEDS_REVIEW, BLOCKED_ON_INPUT, DONE. 
 | [11](tickets/11.md) | Physical tests/release | 10 | DONE |
 | [12](tickets/12.md) | Content packages | 11 | DONE |
 | [13](tickets/13.md) | Video render | 12 | DONE |
-| [14](tickets/14.md) | Real Etsy drafts | 12 | READY |
-| [15](tickets/15.md) | Approved Etsy publication | 14, 04 | TODO |
+| [14](tickets/14.md) | Real Etsy drafts | 12 | DONE |
+| [15](tickets/15.md) | Approved Etsy publication | 14, 04 | READY |
 | [16](tickets/16.md) | Blog publication | 12, 15 | TODO |
 | [17](tickets/17.md) | Usage limits/recovery | 06, 12 | TODO |
 | [18](tickets/18.md) | Complete Ivana pilot | 01–17 | TODO |
@@ -160,6 +160,15 @@ Mock / real integration / physical evidence: Edit-list fixtures pass and invalid
 Commit (if created): pending.
 Remaining gate or decision: Ticket 14 requires an Etsy OAuth and draft adapter based on current official API documentation.
 Next ready ticket: 14.
+
+Ticket 14 / 2026-11-03:
+Implementation outcome: Added an Etsy Open API v3 draft adapter using the documented OAuth bearer and `x-api-key` headers, draft-listing creation, digital PDF upload, download-type update and readback verification. Live calls are enabled only when shop OAuth configuration is present; failures never report a listing ID as created.
+Files changed: Etsy adapter, server configuration, environment example, service integration and mock HTTP tests.
+Checks actually executed and results: `npm test` — 42 passed, 0 failed, 1 skipped without a database URL; `git diff --check` — clean.
+Mock / real integration / physical evidence: Mock contract tests cover success/readback and create failure. No live Etsy shop smoke test was run because no shop credentials were supplied.
+Commit (if created): pending.
+Remaining gate or decision: Ticket 15 adds explicit owner-approved publication with final readback and live URL reconciliation.
+Next ready ticket: 15.
 
 Ticket 10 / 2026-11-03:
 Implementation outcome: Added deterministic versioned tester PDF rendering from structured pattern data, with frame/material details, numbered rows, finishing instructions, project/version metadata and explicit not-for-sale draft language. Added artifact retrieval through the object-store adapter.

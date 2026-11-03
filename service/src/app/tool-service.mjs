@@ -12,12 +12,13 @@ const allowedTools = new Set([
 ]);
 
 export class InaToolService {
-  constructor({ repository, objectStore, allowedTelegramIds = [], now = () => new Date().toISOString(), etsyEnabled = false, approvalSecret, conceptAdapter = new MockConceptAdapter({ now }) }) {
+  constructor({ repository, objectStore, allowedTelegramIds = [], now = () => new Date().toISOString(), etsyEnabled = false, etsyAdapter = null, approvalSecret, conceptAdapter = new MockConceptAdapter({ now }) }) {
     this.repository = repository;
     this.objectStore = objectStore;
     this.allowedTelegramIds = new Set(allowedTelegramIds.map(String));
     this.now = now;
     this.etsyEnabled = etsyEnabled;
+    this.etsyAdapter = etsyAdapter;
     this.approvalSecret = approvalSecret ?? null;
     this.conceptAdapter = conceptAdapter;
   }
@@ -342,12 +343,17 @@ export class InaToolService {
     requireValue(gate.valid && project.state === "approved", "release_gate_blocked", "Release evidence and Ivana approval are required before an Etsy draft.", gate);
     requireValue(listing_payload?.type === "download", "invalid_listing_type", "Only digital download listings are allowed.");
     requireValue(listing_payload?.pdf_path === project.release.finalPdfPath, "invalid_listing_pdf", "Listing must use the approved final PDF version.");
-    if (!this.etsyEnabled) throw new ToolError("etsy_not_configured", "Etsy adapter is intentionally disabled until OAuth credentials and a reviewed draft adapter are configured.", 503);
+    if (!this.etsyEnabled || !this.etsyAdapter) throw new ToolError("etsy_not_configured", "Etsy adapter is disabled until OAuth credentials and a reviewed draft adapter are configured.", 503);
+    requireValue(typeof this.objectStore.read === "function", "etsy_not_configured", "Approved PDF retrieval is not configured.", undefined);
+    const etsyResult = await this.etsyAdapter.createDraft({ listing: listing_payload, pdfBytes: await this.objectStore.read(project.release.finalPdfPath), fileName: `${projectIdSafe(project.id)}-${pattern_version}.pdf` });
+    project.etsyDraft = etsyResult;
     project.state = "etsy_draft_created";
     await this.repository.saveProject(project, "etsy_draft_created", "system");
     return { project_id, pattern_version, state: project.state, etsy_state: "draft", next_allowed_action: "Ivana reviews the Etsy draft. Publication is unavailable." };
   }
 }
+
+function projectIdSafe(projectId) { return String(projectId).replace(/[^A-Za-z0-9_-]/g, "_"); }
 
 function hash(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
