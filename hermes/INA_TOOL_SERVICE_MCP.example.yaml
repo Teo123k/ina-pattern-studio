@@ -1,0 +1,13 @@
+# Copy the mcp_servers entry into ~/.hermes/config.yaml on the same host as the INA repository.
+# Do not commit the real API key. Supply it through Hermes's deployment secret/environment mechanism.
+mcp_servers:
+  ina_pattern_studio:
+    command: node
+    args:
+      - /opt/data/workspace/ina-pattern-studio/service/src/mcp-server.mjs
+    env:
+      INA_TOOL_SERVICE_URL: http://127.0.0.1:3030
+      INA_TOOL_SERVICE_API_KEY: REPLACE_WITH_DEPLOYMENT_SECRET
+
+# After the tool service is running, start a fresh Hermes session or run /reload-mcp.
+# Enable only the ina_pattern_studio MCP toolset for the INA Telegram agent.

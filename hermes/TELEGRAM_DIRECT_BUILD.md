@@ -35,6 +35,8 @@ sequenceDiagram
 
 Hermes's private memory is not a replacement for the project database. Telegram attachments are not a replacement for object storage.
 
+The local MCP bridge configuration is provided in `hermes/INA_TOOL_SERVICE_MCP.example.yaml`. It connects Hermes to the restricted HTTP tool service; it is not a generic filesystem bridge.
+
 ## INA tool service API
 
 Expose only these endpoints or MCP tools in the first deployment:

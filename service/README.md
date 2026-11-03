@@ -21,6 +21,22 @@ The current HTTP service intentionally binds to `127.0.0.1`. Put it behind an au
 
 Allowed tools are listed in `hermes/TELEGRAM_DIRECT_BUILD.md`. Unknown tool names fail with `tool_not_allowed`.
 
+## Hermes MCP bridge
+
+Run the HTTP service, then start the stdio bridge:
+
+```sh
+INA_TOOL_SERVICE_URL=http://127.0.0.1:3030 \
+INA_TOOL_SERVICE_API_KEY="$SERVICE_API_KEY" \
+npm run mcp
+```
+
+Use [the Hermes MCP example](../hermes/INA_TOOL_SERVICE_MCP.example.yaml) as the deployment configuration. The bridge exposes only the exact INA tool allowlist. It does not grant Hermes a shell, filesystem or database-query tool.
+
+## Telegram adapter boundary
+
+`src/telegram/map-update.mjs` converts a Telegram `/new` update plus a downloaded source file into the same intake contract used by the tool service. It deliberately does not contain a bot token, webhook or public listener. See [the synthetic test](../hermes/TELEGRAM_SYNTHETIC_TEST.md).
+
 ## Storage modes
 
 - Automated tests use in-memory persistence and a temporary local object store.
