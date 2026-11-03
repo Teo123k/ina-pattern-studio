@@ -71,6 +71,7 @@ export const toolDefinitions = [
   },
   { name: "generate_content_package", description: "Prepare reviewable blog, Etsy draft copy and social assets from an approved pattern and actual making records.", schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/), public_excerpt: z.string().max(500).optional(), owner_price: z.number().nonnegative().optional(), currency: z.string().length(3).optional() } },
   { name: "revise_content_asset", description: "Revise one generated content asset while preserving its source version and review status.", schema: { project_id: z.string().regex(/^INA-\d+$/), content_version: z.number().int().positive(), asset: z.enum(["blog", "listing", "captions", "video_concepts", "carousel"]), instruction: z.string().min(3).max(500) } },
+  { name: "prepare_video_edit", description: "Validate a reviewable edit decision list from real source clips.", schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/), clips: z.array(record), target_seconds: z.number().positive().optional(), tolerance_seconds: z.number().nonnegative().optional() } },
   {
     name: "create_etsy_draft",
     description: "Create a reviewable digital Etsy draft only after all release gates pass. It cannot publish a listing.",

@@ -33,6 +33,7 @@ test("MCP server exposes exactly the approved INA tools", async () => {
       "get_project",
       "list_projects",
       "prepare_approval",
+      "prepare_video_edit",
       "record_tester_feedback",
       "render_pattern_pdf",
       "resume_project",

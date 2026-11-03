@@ -4,10 +4,11 @@ import { assertPatternCanBeSaved, compactProject, createProject, releaseGate, va
 import { measurementFieldNames, parseConfirmedMeasurements, parseConstructionValidation, parseIntakeMeasurements } from "../contracts/measurement-schema.mjs";
 import { MockConceptAdapter } from "../adapters/concept-adapter.mjs";
 import { renderPatternPdf } from "../render/pattern-pdf.mjs";
+import { validateEditDecision } from "../video/edit-decision.mjs";
 import { validateStructuredPattern } from "../../../agent/tools/validate-structured-pattern.mjs";
 
 const allowedTools = new Set([
-    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "select_concept", "validate_pattern", "save_pattern_draft", "render_pattern_pdf", "get_pattern_pdf", "create_tester_pack", "record_tester_feedback", "check_release_gate", "approve_release", "generate_content_package", "revise_content_asset", "create_etsy_draft"
+    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "select_concept", "validate_pattern", "save_pattern_draft", "render_pattern_pdf", "get_pattern_pdf", "create_tester_pack", "record_tester_feedback", "check_release_gate", "approve_release", "generate_content_package", "revise_content_asset", "prepare_video_edit", "create_etsy_draft"
 ]);
 
 export class InaToolService {
@@ -322,6 +323,17 @@ export class InaToolService {
     content.status = "draft";
     await this.repository.saveProject(project, "content_asset_revised", "system");
     return { project_id, content_version, asset, status: "draft", sourceReferences: content.sourceReferences, result: content[asset] };
+  }
+
+  async prepare_video_edit({ project_id, pattern_version, clips, target_seconds = 120, tolerance_seconds = 5 }) {
+    const project = await this.repository.getProject(project_id);
+    requireValue(project.patterns.some((pattern) => pattern.version === pattern_version), "pattern_not_found", "Pattern version was not found.");
+    const edit = validateEditDecision({ clips, targetSeconds: target_seconds, toleranceSeconds: tolerance_seconds });
+    requireValue(edit.durationValid, "invalid_video_duration", "Clip timeline is outside the requested duration tolerance.", edit);
+    const record = { id: randomUUID(), patternVersion: pattern_version, sourceIds: clips.map((clip) => clip.source_id), edit, status: "review_draft", createdAt: this.now() };
+    project.videoEdits = [...(project.videoEdits ?? []), record];
+    await this.repository.saveProject(project, "video_edit_prepared", "system");
+    return { project_id, pattern_version, ...record };
   }
 
   async create_etsy_draft({ project_id, pattern_version, listing_payload }) {

@@ -18,8 +18,8 @@ Allowed states: TODO, READY, IN_PROGRESS, NEEDS_REVIEW, BLOCKED_ON_INPUT, DONE. 
 | [10](tickets/10.md) | PDF and making guidance | 09 | DONE |
 | [11](tickets/11.md) | Physical tests/release | 10 | DONE |
 | [12](tickets/12.md) | Content packages | 11 | DONE |
-| [13](tickets/13.md) | Video render | 12 | READY |
-| [14](tickets/14.md) | Real Etsy drafts | 12 | TODO |
+| [13](tickets/13.md) | Video render | 12 | DONE |
+| [14](tickets/14.md) | Real Etsy drafts | 12 | READY |
 | [15](tickets/15.md) | Approved Etsy publication | 14, 04 | TODO |
 | [16](tickets/16.md) | Blog publication | 12, 15 | TODO |
 | [17](tickets/17.md) | Usage limits/recovery | 06, 12 | TODO |
@@ -151,6 +151,15 @@ Mock / real integration / physical evidence: Content generation is deterministic
 Commit (if created): pending.
 Remaining gate or decision: Ticket 13 adds clip inventory and a reviewable two-minute edit decision/render path.
 Next ready ticket: 13.
+
+Ticket 13 / 2026-11-03:
+Implementation outcome: Added a source-clip edit decision validator with required process roles, in/out bounds, missing-role reporting, 120-second target and tolerance, and explicit highlights labeling when steps are omitted. The result is stored against a pattern version for a future render adapter.
+Files changed: video edit validator, service tool/contract, package test command and tests.
+Checks actually executed and results: `npm test` — 40 passed, 0 failed, 1 skipped without a database URL; `git diff --check` — clean.
+Mock / real integration / physical evidence: Edit-list fixtures pass and invalid ranges fail. FFmpeg/provider rendering and visual/audio review remain deployment-dependent; no footage or licensed music was invented.
+Commit (if created): pending.
+Remaining gate or decision: Ticket 14 requires an Etsy OAuth and draft adapter based on current official API documentation.
+Next ready ticket: 14.
 
 Ticket 10 / 2026-11-03:
 Implementation outcome: Added deterministic versioned tester PDF rendering from structured pattern data, with frame/material details, numbered rows, finishing instructions, project/version metadata and explicit not-for-sale draft language. Added artifact retrieval through the object-store adapter.
