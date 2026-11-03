@@ -88,6 +88,23 @@ export class PostgresRepository {
     );
   }
 
+  async listProjectsByChat(chatId) {
+    const result = await this.pool.query("SELECT data, revision FROM projects WHERE data->>'ownerChatId' = $1 ORDER BY created_at DESC", [String(chatId)]);
+    return result.rows.map((row) => ({ ...row.data, revision: row.revision }));
+  }
+
+  async setActiveProject(chatId, projectId) {
+    const project = await this.getProject(projectId);
+    if (project.ownerChatId !== String(chatId)) throw new ToolError("project_not_found", "Project was not found for this Telegram chat.", 404);
+    await this.pool.query(`INSERT INTO active_chat_projects (chat_id, project_id) VALUES ($1, $2) ON CONFLICT (chat_id) DO UPDATE SET project_id = EXCLUDED.project_id, updated_at = now()`, [String(chatId), projectId]);
+    return project;
+  }
+
+  async getActiveProject(chatId) {
+    const result = await this.pool.query("SELECT project_id FROM active_chat_projects WHERE chat_id = $1", [String(chatId)]);
+    return result.rowCount ? this.getProject(result.rows[0].project_id) : null;
+  }
+
   async close() {
     await this.pool.end();
   }

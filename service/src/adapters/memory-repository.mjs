@@ -8,6 +8,7 @@ export class MemoryRepository {
     this.assets = new Map();
     this.events = [];
     this.intakeTail = Promise.resolve();
+    this.activeProjects = new Map();
   }
 
   async getProject(id) {
@@ -55,6 +56,7 @@ export class MemoryRepository {
       const now = new Date().toISOString();
       const nextProject = structuredClone({ ...project, revision: 0, updatedAt: now });
       this.projects.set(project.id, nextProject);
+      if (nextProject.ownerChatId) this.activeProjects.set(nextProject.ownerChatId, nextProject.id);
       for (const asset of assets) this.assets.set(asset.id, structuredClone(asset));
       this.events.push({ projectId: project.id, eventType: "project_created", actor, createdAt: now });
       this.telegramEvents.set(key, structuredClone(telegramEvent));
@@ -71,6 +73,22 @@ export class MemoryRepository {
 
   async addMaterial(material) {
     this.materials.set(material.id, structuredClone(material));
+  }
+
+  async listProjectsByChat(chatId) {
+    return [...this.projects.values()].filter((project) => project.ownerChatId === String(chatId)).map((project) => structuredClone(project));
+  }
+
+  async setActiveProject(chatId, projectId) {
+    const project = this.projects.get(projectId);
+    if (!project || project.ownerChatId !== String(chatId)) throw new ToolError("project_not_found", "Project was not found for this Telegram chat.", 404);
+    this.activeProjects.set(String(chatId), projectId);
+    return structuredClone(project);
+  }
+
+  async getActiveProject(chatId) {
+    const projectId = this.activeProjects.get(String(chatId));
+    return projectId ? this.getProject(projectId) : null;
   }
 }
 

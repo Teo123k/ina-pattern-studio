@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { mapNewProjectUpdate, formatTelegramStatus } from "../src/telegram/map-update.mjs";
+import { mapNewProjectMediaGroup, mapNewProjectUpdate, formatTelegramStatus } from "../src/telegram/map-update.mjs";
 
 test("maps a synthetic /new photo message to the approved intake contract", async () => {
   const mapped = await mapNewProjectUpdate({
@@ -32,6 +32,22 @@ test("rejects an intake update without a source attachment", async () => {
     () => mapNewProjectUpdate({ message: { message_id: 46, from: { id: 101 }, text: "/new" } }, async () => ({ content_base64: "x" })),
     { code: "missing_attachment" }
   );
+});
+
+test("checks sender before downloading and enforces media limits", async () => {
+  let downloads = 0;
+  await assert.rejects(() => mapNewProjectUpdate({ message: { message_id: 48, from: { id: 999 }, text: "/new", photo: [{ file_id: "photo" }] } }, async () => { downloads += 1; return { content_base64: "YQ==" }; }, { allowedTelegramIds: ["101"] }), { code: "sender_not_allowed" });
+  assert.equal(downloads, 0);
+  await assert.rejects(() => mapNewProjectUpdate({ message: { message_id: 49, from: { id: 101 }, text: "/new", photo: [{ file_id: "photo" }] } }, async () => ({ content_base64: "YQ==", size_bytes: 11 }), { maxBytes: 10 }), { code: "attachment_too_large" });
+});
+
+test("maps a media group into one intake with multiple original attachments", async () => {
+  const mapped = await mapNewProjectMediaGroup([
+    { message_id: 51, from: { id: 101 }, chat: { id: 202 }, caption: "/new shell", photo: [{ file_id: "a" }] },
+    { message_id: 52, from: { id: 101 }, chat: { id: 202 }, photo: [{ file_id: "b" }] }
+  ], async (fileId) => ({ content_base64: fileId }), { allowedTelegramIds: ["101"] });
+  assert.equal(mapped.attachments.length, 2);
+  assert.equal(mapped.text, "shell");
 });
 
 test("formats each Telegram status with project, state and next action", () => {

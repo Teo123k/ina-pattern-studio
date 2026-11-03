@@ -10,8 +10,8 @@ Allowed states: TODO, READY, IN_PROGRESS, NEEDS_REVIEW, BLOCKED_ON_INPUT, DONE. 
 | [02](tickets/02.md) | Version-bound validation | 01 | DONE |
 | [03](tickets/03.md) | Atomic persistence/concurrency | 02 | DONE |
 | [04](tickets/04.md) | Verified actor and approvals | 03 | DONE |
-| [05](tickets/05.md) | Telegram intake/navigation | 04 | READY |
-| [06](tickets/06.md) | Jobs and operations | 05 | TODO |
+| [05](tickets/05.md) | Telegram intake/navigation | 04 | DONE |
+| [06](tickets/06.md) | Jobs and operations | 05 | READY |
 | [07](tickets/07.md) | Materials and frame | 06 | TODO |
 | [08](tickets/08.md) | Design concepts | 07 | TODO |
 | [09](tickets/09.md) | Structured pattern generation | 08 | TODO |
@@ -88,3 +88,12 @@ Mock / real integration / physical evidence: Tests cover forged actor, mismatche
 Commit (if created): pending.
 Remaining gate or decision: Gateway deployment must provide `SERVICE_API_KEY` and `TELEGRAM_APPROVAL_SECRET` when it calls the protected callback endpoint.
 Next ready ticket: 05.
+
+Ticket 05 / 2026-11-03:
+Implementation outcome: Added chat-scoped project list, select and resume tools with persisted active project state. Intake automatically selects the newly created project. Telegram mapping now checks sender before download, enforces size and MIME limits, supports caption/text commands, reply references and media groups, and preserves bot/chat/message identity.
+Files changed: Telegram mapper, project navigation tools/contracts, memory and PostgreSQL repositories, migration 003, and tests.
+Checks actually executed and results: `npm test` — 32 passed, 0 failed, 1 skipped without a database URL; `INA_TEST_DATABASE_URL=postgres://ina@127.0.0.1:54340/ina_pattern_studio_test npm run test:integration` — 1 passed, 0 failed, 0 skipped; `git diff --check` — clean.
+Mock / real integration / physical evidence: Synthetic Telegram mapping tests cover unauthorized no-download, MIME/size limits, captions, `/newspaper`, replies and media groups. PostgreSQL integration applies migration 003 and verifies persistence. No live Telegram owner session.
+Commit (if created): pending.
+Remaining gate or decision: Ticket 06 adds durable jobs and operational recovery.
+Next ready ticket: 06.

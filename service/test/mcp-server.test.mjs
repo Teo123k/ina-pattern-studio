@@ -23,11 +23,14 @@ test("MCP server exposes exactly the approved INA tools", async () => {
       "create_tester_pack",
       "find_material_options",
       "get_project",
+      "list_projects",
       "prepare_approval",
       "record_tester_feedback",
+      "resume_project",
       "save_material_selection",
       "save_measurements",
       "save_pattern_draft",
+      "select_project",
       "validate_pattern"
     ]);
     assert.equal(names.includes("publish_etsy_listing"), false);

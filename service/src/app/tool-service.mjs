@@ -4,7 +4,7 @@ import { assertPatternCanBeSaved, compactProject, createProject, releaseGate, va
 import { measurementFieldNames, parseConfirmedMeasurements, parseConstructionValidation, parseIntakeMeasurements } from "../contracts/measurement-schema.mjs";
 
 const allowedTools = new Set([
-  "create_project_from_telegram", "get_project", "prepare_approval", "save_measurements", "find_material_options", "save_material_selection", "validate_pattern", "save_pattern_draft", "create_tester_pack", "record_tester_feedback", "check_release_gate", "create_etsy_draft"
+  "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "prepare_approval", "save_measurements", "find_material_options", "save_material_selection", "validate_pattern", "save_pattern_draft", "create_tester_pack", "record_tester_feedback", "check_release_gate", "create_etsy_draft"
 ]);
 
 export class InaToolService {
@@ -68,6 +68,7 @@ export class InaToolService {
         await removeStagedAssets(this.objectStore, storedAssets);
         return { ...intake.result, duplicate: true };
       }
+      if (typeof this.repository.setActiveProject === "function") await this.repository.setActiveProject(chat_id, projectId);
       return intake.result;
     } catch (error) {
       if (!(error instanceof TransactionOutcomeUnknownError)) await removeStagedAssets(this.objectStore, storedAssets);
@@ -77,6 +78,22 @@ export class InaToolService {
 
   async get_project({ project_id }) {
     return compactProject(await this.repository.getProject(project_id));
+  }
+
+  async list_projects({ chat_id }) {
+    const projects = await this.repository.listProjectsByChat(chat_id);
+    return { chat_id: String(chat_id), projects: projects.map((project) => ({ project_id: project.id, state: project.state, updated_at: project.updatedAt, next_action: project.measurements?.confirmed ? "Continue the current project." : "Confirm measurements." })) };
+  }
+
+  async select_project({ chat_id, project_id }) {
+    const project = await this.repository.setActiveProject(chat_id, project_id);
+    return { project_id: project.id, state: project.state, selected: true, next_action: project.measurements?.confirmed ? "Continue the current project." : "Confirm measurements." };
+  }
+
+  async resume_project({ chat_id }) {
+    const project = await this.repository.getActiveProject(chat_id);
+    if (!project) return { chat_id: String(chat_id), selected: false, next_action: "Choose a project or send /new with a source image." };
+    return { project_id: project.id, state: project.state, selected: true, next_action: project.measurements?.confirmed ? "Continue the current project." : "Confirm measurements." };
   }
 
   async prepare_approval({ project_id, operation, subject }) {

@@ -56,6 +56,18 @@ test("creates an internal project and deduplicates Telegram delivery", async () 
   assert.equal(second.project_id, first.project_id);
 });
 
+test("lists, selects and resumes projects within the owner chat", async () => {
+  const service = await makeService();
+  const project = await createProject(service);
+  const listed = await service.call("list_projects", { chat_id: "chat-101" });
+  assert.equal(listed.projects.length, 1);
+  assert.equal(listed.projects[0].project_id, project.project_id);
+  await service.call("select_project", { chat_id: "chat-101", project_id: project.project_id });
+  const resumed = await service.call("resume_project", { chat_id: "chat-101" });
+  assert.equal(resumed.project_id, project.project_id);
+  await assert.rejects(() => service.call("select_project", { chat_id: "other-chat", project_id: project.project_id }), { code: "project_not_found" });
+});
+
 test("consumes only one verified owner approval for the exact action", async () => {
   const service = await makeService();
   const project = await createProject(service);
