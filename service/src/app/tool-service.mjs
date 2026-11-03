@@ -8,17 +8,19 @@ import { validateEditDecision } from "../video/edit-decision.mjs";
 import { validateStructuredPattern } from "../../../agent/tools/validate-structured-pattern.mjs";
 
 const allowedTools = new Set([
-    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "select_concept", "validate_pattern", "save_pattern_draft", "render_pattern_pdf", "get_pattern_pdf", "create_tester_pack", "record_tester_feedback", "check_release_gate", "approve_release", "generate_content_package", "revise_content_asset", "prepare_video_edit", "create_etsy_draft", "publish_etsy_listing"
+    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "select_concept", "validate_pattern", "save_pattern_draft", "render_pattern_pdf", "get_pattern_pdf", "create_tester_pack", "record_tester_feedback", "check_release_gate", "approve_release", "generate_content_package", "revise_content_asset", "prepare_video_edit", "create_etsy_draft", "publish_etsy_listing", "create_wordpress_draft", "publish_wordpress_post"
 ]);
 
 export class InaToolService {
-  constructor({ repository, objectStore, allowedTelegramIds = [], now = () => new Date().toISOString(), etsyEnabled = false, etsyAdapter = null, approvalSecret, conceptAdapter = new MockConceptAdapter({ now }) }) {
+  constructor({ repository, objectStore, allowedTelegramIds = [], now = () => new Date().toISOString(), etsyEnabled = false, etsyAdapter = null, wordpressEnabled = false, wordpressAdapter = null, approvalSecret, conceptAdapter = new MockConceptAdapter({ now }) }) {
     this.repository = repository;
     this.objectStore = objectStore;
     this.allowedTelegramIds = new Set(allowedTelegramIds.map(String));
     this.now = now;
     this.etsyEnabled = etsyEnabled;
     this.etsyAdapter = etsyAdapter;
+    this.wordpressEnabled = wordpressEnabled;
+    this.wordpressAdapter = wordpressAdapter;
     this.approvalSecret = approvalSecret ?? null;
     this.conceptAdapter = conceptAdapter;
   }
@@ -115,7 +117,7 @@ export class InaToolService {
   async prepare_approval({ project_id, operation, subject }) {
     requireValue(this.approvalSecret, "approval_not_configured", "Approval callbacks are not configured.", undefined);
     const project = await this.repository.getProject(project_id);
-    requireValue(["confirm_measurements", "select_material", "select_concept", "create_tester_pack", "approve_release", "publish_etsy"].includes(operation), "invalid_approval_operation", "This action cannot be confirmed through an approval callback.");
+    requireValue(["confirm_measurements", "select_material", "select_concept", "create_tester_pack", "approve_release", "publish_etsy", "publish_wordpress"].includes(operation), "invalid_approval_operation", "This action cannot be confirmed through an approval callback.");
     const subjectHash = hash(subject);
     const challenge = { id: randomUUID(), operation, subjectHash, actorId: project.ownerTelegramId, chatId: project.ownerChatId, expiresAt: new Date(Date.parse(this.now()) + 15 * 60_000).toISOString(), status: "pending", createdAt: this.now() };
     project.approvalChallenges = [...(project.approvalChallenges ?? []), challenge];
@@ -364,6 +366,32 @@ export class InaToolService {
     project.state = "published";
     await this.repository.saveProject(project, "etsy_published", "ivana");
     return { project_id, pattern_version, state: project.state, live_url: publication.liveUrl, listing_id: publication.listingId };
+  }
+
+  async create_wordpress_draft({ project_id, content_version, etsy_live_url, featured_image_url }) {
+    const project = await this.repository.getProject(project_id);
+    const content = project.contentVersions?.find((item) => item.version === content_version);
+    requireValue(content?.status === "draft", "content_not_found", "A reviewable content package is required.");
+    requireValue(project.etsyPublication?.liveUrl === etsy_live_url, "etsy_url_mismatch", "Use the verified Etsy live URL recorded for this project.");
+    requireValue(/^https:\/\//.test(featured_image_url ?? ""), "invalid_featured_image", "A real HTTPS finished-product image URL is required.");
+    requireValue(this.wordpressEnabled && this.wordpressAdapter, "wordpress_not_configured", "WordPress.com publishing is not configured.");
+    const article = { title: content.blog.title, body: `${content.blog.body}<p><a href="${etsy_live_url}">Get the tested digital pattern on Etsy</a>.</p>`, featuredImageUrl: featured_image_url };
+    const draft = await this.wordpressAdapter.createDraft({ title: article.title, content: article.body, featuredImageUrl: article.featuredImageUrl });
+    project.wordpressDraft = { ...draft, contentVersion: content_version, etsyLiveUrl: etsy_live_url, createdAt: this.now() };
+    await this.repository.saveProject(project, "wordpress_draft_created", "system");
+    return { project_id, content_version, post_id: draft.postId, preview_url: draft.previewUrl, state: "wordpress_draft_created", next_allowed_action: "Ivana reviews the final blog preview and approves this exact post." };
+  }
+
+  async publish_wordpress_post({ project_id, content_version, post_id, approval_id }) {
+    const project = await this.repository.getProject(project_id);
+    const draft = project.wordpressDraft;
+    requireValue(draft?.postId === String(post_id) && draft.contentVersion === content_version, "wordpress_post_mismatch", "The requested post is not the current reviewed WordPress draft.");
+    consumeApproval(project, approval_id, "publish_wordpress", { project_id, content_version, post_id: String(post_id), fingerprint: draft.fingerprint, etsy_live_url: draft.etsyLiveUrl }, this.now());
+    requireValue(this.wordpressEnabled && this.wordpressAdapter?.publishDraft, "wordpress_not_configured", "WordPress.com publishing is not configured.");
+    const publication = await this.wordpressAdapter.publishDraft({ postId: String(post_id), expectedFingerprint: draft.fingerprint });
+    project.wordpressPublication = { ...publication, contentVersion: content_version, etsyLiveUrl: draft.etsyLiveUrl, publishedAt: this.now() };
+    await this.repository.saveProject(project, "wordpress_published", "ivana");
+    return { project_id, content_version, post_id: publication.postId, live_url: publication.liveUrl, state: publication.status };
   }
 }
 

@@ -196,3 +196,12 @@ Mock / real integration / physical evidence: Usage behavior is unit-tested in me
 Commit (if created): pending.
 Remaining gate or decision: Wire the meter to a durable usage table and the actual worker/provider before calling this ticket complete.
 Next ready ticket: Ticket 18 is blocked until Ivana supplies a live Telegram pilot, real source media, physical tester evidence, CMS choice and optional Etsy credentials.
+
+Ticket 16 / 2026-11-03:
+Implementation outcome: WordPress.com is the single chosen CMS. Added a narrow OAuth-token adapter using the official WordPress.com post API: create a draft, persist post ID/preview/fingerprint/image reference, re-read the exact post before publishing, then verify its public URL. The service requires the verified Etsy live URL and a real HTTPS finished-product image, and binds Telegram approval to the exact WordPress draft fingerprint. A starter-site blueprint defines the initial pages and article template.
+Files changed: WordPress adapter/tests, tool service/contracts, server configuration, MCP registry test, environment example, site starter guide and test script.
+Checks actually executed and results: `npm test` — 48 passed, 0 failed, 1 skipped without a database URL; `git diff --check` — clean.
+Mock / real integration / physical evidence: Mock HTTP tests cover draft-to-publish readback and edited-draft blocking. No WordPress.com site, OAuth token, real Etsy URL, owned finished image or explicitly approved live blog publication exists yet.
+Commit (if created): pending.
+Remaining gate or decision: Create the free WordPress.com site, then provide its numeric site ID and OAuth token only through deployment secrets. A real approved draft/publication test is required before this ticket can be marked DONE.
+Next ready ticket: Ticket 17 remains IN_PROGRESS; its usage meter must be made durable and wired to the real worker/provider.

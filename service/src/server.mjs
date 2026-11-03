@@ -7,6 +7,7 @@ import { PostgresRepository } from "./adapters/postgres-repository.mjs";
 import { LocalObjectStore } from "./adapters/local-object-store.mjs";
 import { S3ObjectStore } from "./adapters/s3-object-store.mjs";
 import { EtsyAdapter } from "./adapters/etsy-adapter.mjs";
+import { WordPressAdapter } from "./adapters/wordpress-adapter.mjs";
 import { ToolError } from "./domain/errors.mjs";
 
 const port = Number(process.env.PORT ?? 3030);
@@ -35,7 +36,10 @@ const objectStore = process.env.OBJECT_STORAGE_DRIVER === "s3"
 const etsyAdapter = process.env.ETSY_SHOP_ID && process.env.ETSY_API_KEY && process.env.ETSY_API_SECRET && process.env.ETSY_ACCESS_TOKEN
   ? new EtsyAdapter({ shopId: process.env.ETSY_SHOP_ID, apiKey: process.env.ETSY_API_KEY, apiSecret: process.env.ETSY_API_SECRET, accessToken: process.env.ETSY_ACCESS_TOKEN })
   : null;
-const service = new InaToolService({ repository, objectStore, allowedTelegramIds, approvalSecret, etsyEnabled: Boolean(etsyAdapter), etsyAdapter });
+const wordpressAdapter = process.env.WORDPRESS_SITE_ID && process.env.WORDPRESS_ACCESS_TOKEN
+  ? new WordPressAdapter({ siteId: process.env.WORDPRESS_SITE_ID, accessToken: process.env.WORDPRESS_ACCESS_TOKEN })
+  : null;
+const service = new InaToolService({ repository, objectStore, allowedTelegramIds, approvalSecret, etsyEnabled: Boolean(etsyAdapter), etsyAdapter, wordpressEnabled: Boolean(wordpressAdapter), wordpressAdapter });
 
 function send(response, status, body) {
   response.writeHead(status, { "content-type": "application/json; charset=utf-8" });
