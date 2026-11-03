@@ -16,8 +16,8 @@ Allowed states: TODO, READY, IN_PROGRESS, NEEDS_REVIEW, BLOCKED_ON_INPUT, DONE. 
 | [08](tickets/08.md) | Design concepts | 07 | DONE |
 | [09](tickets/09.md) | Structured pattern generation | 08 | DONE |
 | [10](tickets/10.md) | PDF and making guidance | 09 | DONE |
-| [11](tickets/11.md) | Physical tests/release | 10 | READY |
-| [12](tickets/12.md) | Content packages | 11 | TODO |
+| [11](tickets/11.md) | Physical tests/release | 10 | DONE |
+| [12](tickets/12.md) | Content packages | 11 | READY |
 | [13](tickets/13.md) | Video render | 12 | TODO |
 | [14](tickets/14.md) | Real Etsy drafts | 12 | TODO |
 | [15](tickets/15.md) | Approved Etsy publication | 14, 04 | TODO |
@@ -133,6 +133,15 @@ Mock / real integration / physical evidence: Known-good and deliberately invalid
 Commit (if created): pending.
 Remaining gate or decision: Ticket 10 renders the structured draft into a versioned PDF and making guidance.
 Next ready ticket: 10.
+
+Ticket 11 / 2026-11-03:
+Implementation outcome: Physical feedback now stores version-bound maker records with completion, actual grams/minutes, photos, notes and issue severity/resolution. Completed records cannot be replayed for the same maker and pattern version; distinct tester identity is required. Release approval is a separate verified callback action bound to the exact rendered PDF path and pattern content hash, while release-gate inspection stays read-only.
+Files changed: project testing model, release gate/service, tool contract and tests.
+Checks actually executed and results: `npm test` — 38 passed, 0 failed, 1 skipped without a database URL; `git diff --check` — clean.
+Mock / real integration / physical evidence: Code tests cover the new contract and existing release blocking. No physical making evidence exists yet, so production readiness is not claimed.
+Commit (if created): pending.
+Remaining gate or decision: Ticket 12 can prepare content drafts only from approved pattern and actual making notes.
+Next ready ticket: 12.
 
 Ticket 10 / 2026-11-03:
 Implementation outcome: Added deterministic versioned tester PDF rendering from structured pattern data, with frame/material details, numbered rows, finishing instructions, project/version metadata and explicit not-for-sale draft language. Added artifact retrieval through the object-store adapter.

@@ -7,7 +7,7 @@ import { renderPatternPdf } from "../render/pattern-pdf.mjs";
 import { validateStructuredPattern } from "../../../agent/tools/validate-structured-pattern.mjs";
 
 const allowedTools = new Set([
-    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "select_concept", "validate_pattern", "save_pattern_draft", "render_pattern_pdf", "get_pattern_pdf", "create_tester_pack", "record_tester_feedback", "check_release_gate", "create_etsy_draft"
+    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "select_concept", "validate_pattern", "save_pattern_draft", "render_pattern_pdf", "get_pattern_pdf", "create_tester_pack", "record_tester_feedback", "check_release_gate", "approve_release", "create_etsy_draft"
 ]);
 
 export class InaToolService {
@@ -257,9 +257,11 @@ export class InaToolService {
     const project = await this.repository.getProject(project_id);
     requireValue(project.patterns.some((pattern) => pattern.version === pattern_version), "pattern_not_found", "Pattern version was not found.");
     requireValue(feedback && typeof feedback === "object", "invalid_feedback", "Structured tester feedback is required.");
-    if (feedback.kind === "prototype" && feedback.completed === true) project.testing.prototypeCount += 1;
-    if (feedback.kind === "tester" && feedback.completed === true) project.testing.testerCount += 1;
-    if (Number.isInteger(feedback.criticalIssuesOpen)) project.testing.criticalIssuesOpen = feedback.criticalIssuesOpen;
+    requireValue(["prototype", "tester"].includes(feedback.kind), "invalid_feedback", "Feedback kind must be prototype or tester.");
+    requireValue(typeof feedback.maker_id === "string" && feedback.maker_id.trim(), "invalid_feedback", "A stable maker_id is required.");
+    const duplicate = (project.testing.records ?? []).some((record) => record.patternVersion === pattern_version && record.makerId === feedback.maker_id && record.completed === true);
+    requireValue(!duplicate, "duplicate_tester_feedback", "This maker's completed feedback is already recorded for this pattern version.");
+    project.testing.records = [...(project.testing.records ?? []), { kind: feedback.kind, makerId: feedback.maker_id, patternVersion: pattern_version, completed: feedback.completed === true, actualGrams: feedback.actual_grams ?? null, actualMinutes: feedback.actual_minutes ?? null, photos: feedback.photos ?? [], issues: feedback.issues ?? [], notes: feedback.notes ?? "", recordedAt: this.now() }];
     project.state = "tester_review";
     await this.repository.saveProject(project, "tester_feedback_recorded", feedback.kind ?? "tester");
     return compactProject(project);
@@ -270,6 +272,21 @@ export class InaToolService {
     requireValue(project.patterns.some((pattern) => pattern.version === pattern_version), "pattern_not_found", "Pattern version was not found.");
     const gate = releaseGate(project);
     return { project_id, pattern_version, state: project.state, ...gate, next_allowed_action: gate.valid ? "Create a reviewable Etsy digital draft." : "Provide the missing release evidence." };
+  }
+
+  async approve_release({ project_id, pattern_version, final_pdf_path, pattern_hash, approval_id }) {
+    const project = await this.repository.getProject(project_id);
+    const pattern = project.patterns.find((item) => item.version === pattern_version);
+    requireValue(pattern, "pattern_not_found", "Pattern version was not found.");
+    requireValue(pattern.pdfPath === final_pdf_path && pattern.pdfChecksum, "invalid_release_artifact", "Release must name the rendered PDF artifact for this pattern version.");
+    consumeApproval(project, approval_id, "approve_release", { project_id, pattern_version, final_pdf_path, pattern_hash }, this.now());
+    requireValue(pattern_hash === hashValue(pattern.draft), "invalid_pattern_hash", "Release approval does not match the current pattern content.");
+    const gate = releaseGate(project);
+    requireValue(gate.valid, "release_gate_blocked", "Physical testing evidence is incomplete.", gate);
+    project.release = { ivanaApproval: true, finalPdfPath: final_pdf_path, finalPatternHash: pattern_hash, etsyDraftReviewed: false };
+    project.state = "approved";
+    await this.repository.saveProject(project, "release_approved", "ivana");
+    return { project_id, pattern_version, state: project.state, ...gate, approved: true };
   }
 
   async create_etsy_draft({ project_id, pattern_version, listing_payload }) {
@@ -288,6 +305,8 @@ export class InaToolService {
 function hash(value) {
   return createHash("sha256").update(JSON.stringify(value)).digest("hex");
 }
+
+function hashValue(value) { return createHash("sha256").update(JSON.stringify(value)).digest("hex"); }
 
 function callbackData(projectId, challengeId, secret) {
   const signature = createHmac("sha256", secret).update(`${projectId}:${challengeId}`).digest("hex").slice(0, 24);

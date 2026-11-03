@@ -23,7 +23,7 @@ export function createProject({ projectId, ownerTelegramId, ownerChatId, text, a
     latestValidation: null,
     validationHistory: [],
     patterns: [],
-    testing: { prototypeCount: 0, testerCount: 0, criticalIssuesOpen: 0 },
+    testing: { prototypeCount: 0, testerCount: 0, criticalIssuesOpen: 0, records: [] },
     release: { ivanaApproval: false, finalPdfPath: null, etsyDraftReviewed: false },
     audit: []
     ,approvalChallenges: []
@@ -70,11 +70,15 @@ export function assertPatternCanBeSaved(project, version, validationId) {
 }
 
 export function releaseGate(project) {
+  const records = project.testing?.records ?? [];
+  const prototypeCount = records.filter((record) => record.kind === "prototype" && record.completed).length || project.testing.prototypeCount;
+  const testerCount = new Set(records.filter((record) => record.kind === "tester" && record.completed).map((record) => record.makerId)).size || project.testing.testerCount;
+  const criticalIssuesOpen = records.flatMap((record) => record.issues ?? []).filter((issue) => issue.severity === "critical" && issue.resolved !== true).length;
   return validateReleaseGate({
     ivanaApproval: project.release.ivanaApproval,
-    prototypeCount: project.testing.prototypeCount,
-    testerCount: project.testing.testerCount,
-    criticalIssuesOpen: project.testing.criticalIssuesOpen,
+    prototypeCount,
+    testerCount,
+    criticalIssuesOpen,
     finalPdfPath: project.release.finalPdfPath,
     etsyDraftReviewed: project.release.etsyDraftReviewed
   });
@@ -90,10 +94,15 @@ export function compactProject(project) {
     selectedConcept: project.selectedConcept ?? null,
     latestValidation: project.latestValidation,
     currentPattern: project.patterns.at(-1) ?? null,
-    testing: project.testing,
+    testing: summarizeTesting(project),
     release: project.release,
     nextAllowedAction: nextAllowedAction(project)
   };
+}
+
+export function summarizeTesting(project) {
+  const records = project.testing?.records ?? [];
+  return { prototypeCount: records.filter((record) => record.kind === "prototype" && record.completed).length || project.testing?.prototypeCount || 0, testerCount: new Set(records.filter((record) => record.kind === "tester" && record.completed).map((record) => record.makerId)).size || project.testing?.testerCount || 0, criticalIssuesOpen: records.flatMap((record) => record.issues ?? []).filter((issue) => issue.severity === "critical" && issue.resolved !== true).length, records };
 }
 
 export function nextAllowedAction(project) {

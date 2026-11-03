@@ -18,6 +18,7 @@ test("MCP server exposes exactly the approved INA tools", async () => {
     const names = result.tools.map((tool) => tool.name).sort();
     assert.deepEqual(names, [
       "add_material_option",
+      "approve_release",
       "cancel_job",
       "check_release_gate",
       "create_etsy_draft",

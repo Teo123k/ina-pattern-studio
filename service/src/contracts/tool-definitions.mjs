@@ -65,6 +65,11 @@ export const toolDefinitions = [
     schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/) }
   },
   {
+    name: "approve_release",
+    description: "Record Ivana's verified approval for the exact tested pattern PDF and hash.",
+    schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/), final_pdf_path: z.string().min(1), pattern_hash: z.string().length(64), approval_id: approval.shape.approval_id }
+  },
+  {
     name: "create_etsy_draft",
     description: "Create a reviewable digital Etsy draft only after all release gates pass. It cannot publish a listing.",
     schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/), listing_payload: record }
