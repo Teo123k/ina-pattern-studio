@@ -1,5 +1,11 @@
 # INA Pattern Studio
 
+For implementation, start with [the ticket-based build guide](build/README.md). It includes a [copyable builder prompt](build/BUILDER_PROMPT.md), [18 scoped tickets and status](build/STATUS.md), and [Ivana's Telegram experience](build/TELEGRAM_EXPERIENCE.md).
+
+Start with [SYSTEM_ROADMAP.md](SYSTEM_ROADMAP.md) for the current software status, build order and acceptance checks. Development happens here; Hermes reads the guidance and uses the deployed service through MCP.
+
+The [end-to-end build plan](END_TO_END_BUILD_PLAN.md) covers making and testing the first pattern, content/video creation, and planned direct Etsy and blog publication after Ivana approves the final versions. Current runtime tools remain at their existing implementation stage.
+
 This workspace supports research, decisions, and eventual execution for Ivana's London-based crochet business.
 
 Current stage: business plan prepared following the user's request to proceed. Execution and customer validation are not yet complete.
@@ -10,7 +16,7 @@ Read [the market research and options](research/2026-11-03-market-research.md). 
 
 Start with [the business plan](BUSINESS_PLAN.md), then use [the execution tracker](EXECUTION.md). The plan contains provisional capacity and spending assumptions; these are not confirmed founder commitments.
 
-The research brief is retained as a historical record. The business plan is the current strategic reference; the execution tracker is the single source of truth for task status and measured results.
+The research brief is retained as a historical record. The business plan is the strategic reference; the execution tracker tracks business tasks and results. The system roadmap tracks software delivery.
 
 The first technical foundation for the approval-gated pattern agent is in [agent/README.md](agent/README.md). It is intentionally designed to prepare Etsy drafts only; publishing remains a separate action after Ivana's explicit approval.
 
@@ -20,7 +26,7 @@ The Hermes-ready project pack, designed for a controlled deployment rather than 
 
 INA uses a direct Hermes Telegram bot, not n8n. The specific direct-integration deployment plan is [hermes/TELEGRAM_DIRECT_BUILD.md](hermes/TELEGRAM_DIRECT_BUILD.md).
 
-To have Hermes implement the local tool-service foundation, use the staged [Hermes build prompt](hermes/INA_HERMES_BUILD_PROMPT.md). It builds and proves the internal workflow before any external account connection or deployment.
+The earlier [Hermes build prompt](hermes/INA_HERMES_BUILD_PROMPT.md) is retained as implementation background. Follow the system roadmap for current work; Hermes now acts as the runtime user of the service.
 
 ## Tool service
 

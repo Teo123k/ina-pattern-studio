@@ -1,6 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { ToolError, requireValue } from "../domain/errors.mjs";
 import { assertPatternCanBeSaved, compactProject, createProject, releaseGate, validateConstruction } from "../domain/project.mjs";
+import { measurementFieldNames, parseConfirmedMeasurements, parseIntakeMeasurements } from "../contracts/measurement-schema.mjs";
 
 const allowedTools = new Set([
   "create_project_from_telegram", "get_project", "save_measurements", "find_material_options", "save_material_selection", "validate_pattern", "save_pattern_draft", "create_tester_pack", "record_tester_feedback", "check_release_gate", "create_etsy_draft"
@@ -28,7 +29,7 @@ export class InaToolService {
     const existing = await this.repository.findTelegramEvent(message_id);
     if (existing) return { ...existing.result, duplicate: true };
     requireValue(Array.isArray(attachments) && attachments.length > 0, "missing_attachment", "At least one source attachment is required.");
-    requireValue(measurements && typeof measurements === "object" && !Array.isArray(measurements), "invalid_measurements", "Measurements must be an object.");
+    const parsedMeasurements = parseIntakeMeasurements(measurements);
     const projectId = `INA-${Date.now()}${Math.floor(Math.random() * 1000)}`;
     const now = this.now();
     const storedAssets = [];
@@ -40,10 +41,9 @@ export class InaToolService {
         storedAssets.push({ id: randomUUID(), projectId, messageId: String(message_id), kind: attachment.kind, ...stored, createdAt: now });
       }
       for (const asset of storedAssets) await this.repository.storeAsset(asset);
-      const project = createProject({ projectId, ownerTelegramId: sender_id, text, attachments: storedAssets, measurements, now });
+      const project = createProject({ projectId, ownerTelegramId: sender_id, text, attachments: storedAssets, measurements: parsedMeasurements, now });
       await this.repository.saveProject(project, "project_created", String(sender_id));
-      const requiredFields = ["diameterCm", "heightCm", "fittingDescription", "gaugeStitchesPer10Cm", "motifRepeatStitches"];
-      const missingFields = requiredFields.filter((key) => measurements[key] === undefined || measurements[key] === null || measurements[key] === "");
+      const missingFields = measurementFieldNames.filter((key) => parsedMeasurements[key] === undefined);
       const result = {
         project_id: projectId,
         state: project.state,
@@ -51,7 +51,7 @@ export class InaToolService {
         missing_fields: missingFields,
         next_allowed_action: "Confirm frame dimensions, fitting, gauge and motif repeat."
       };
-      await this.repository.saveTelegramEvent(message_id, { result, senderId: String(sender_id), checksum: createHash("sha256").update(JSON.stringify({ text, attachments, measurements })).digest("hex"), receivedAt: now });
+      await this.repository.saveTelegramEvent(message_id, { result, senderId: String(sender_id), checksum: createHash("sha256").update(JSON.stringify({ text, attachments, measurements: parsedMeasurements })).digest("hex"), receivedAt: now });
       return result;
     } catch (error) {
       if (typeof this.objectStore.remove === "function") {
@@ -69,10 +69,8 @@ export class InaToolService {
     const project = await this.repository.getProject(project_id);
     requireValue(confirmed_by === "ivana", "approval_required", "Measurements must be confirmed by Ivana.", { confirmed_by });
     requireValue(measurement_version === project.measurements.version + 1, "measurement_version_conflict", "measurement_version must be exactly one greater than the current version.", { expected: project.measurements.version + 1 });
-    for (const key of ["diameterCm", "heightCm", "fittingDescription", "gaugeStitchesPer10Cm", "motifRepeatStitches"]) {
-      requireValue(confirmed_values?.[key] !== undefined && confirmed_values[key] !== null && confirmed_values[key] !== "", "missing_measurement", `${key} is required for confirmation.`);
-    }
-    project.measurements = { version: measurement_version, status: "CONFIRMED", confirmed: true, values: structuredClone(confirmed_values), confirmedBy: "ivana", confirmedAt: this.now() };
+    const parsedMeasurements = parseConfirmedMeasurements(confirmed_values);
+    project.measurements = { version: measurement_version, status: "CONFIRMED", confirmed: true, values: structuredClone(parsedMeasurements), confirmedBy: "ivana", confirmedAt: this.now() };
     project.state = "construction";
     await this.repository.saveProject(project, "measurements_confirmed", "ivana");
     return compactProject(project);

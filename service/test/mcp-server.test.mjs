@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
+import { toolDefinitions } from "../src/contracts/tool-definitions.mjs";
 
 test("MCP server exposes exactly the approved INA tools", async () => {
   const transport = new StdioClientTransport({
@@ -33,4 +34,21 @@ test("MCP server exposes exactly the approved INA tools", async () => {
   } finally {
     await client.close();
   }
+});
+
+test("MCP measurement schemas reject numeric strings and unknown fields", () => {
+  const intake = toolDefinitions.find((tool) => tool.name === "create_project_from_telegram");
+  const confirm = toolDefinitions.find((tool) => tool.name === "save_measurements");
+  assert.equal(intake.schema.measurements.safeParse({ diameterCm: "30" }).success, false);
+  assert.equal(intake.schema.measurements.safeParse({ unknown: 1 }).success, false);
+  assert.equal(confirm.schema.confirmed_values.safeParse({
+    diameterCm: 30,
+    heightCm: 20,
+    fittingDescription: "frame",
+    yarnIdentity: "cotton",
+    hookMm: 4,
+    gaugeStitchesPer10Cm: 14,
+    gaugeRowsPer10Cm: 10,
+    motifRepeatStitches: 12
+  }).success, true);
 });

@@ -1,5 +1,6 @@
 import { validatePatternConstruction, validateReleaseGate } from "../../../agent/tools/validate-pattern.mjs";
 import { ToolError, requireValue } from "./errors.mjs";
+import { measurementFieldNames } from "../contracts/measurement-schema.mjs";
 
 export const PROJECT_STATES = new Set([
   "brief", "construction", "pattern_draft", "prototype", "tester_review", "release_candidate", "approved", "etsy_draft_created"
@@ -25,7 +26,7 @@ export function createProject({ projectId, ownerTelegramId, text, attachments, m
 
 export function assertConfirmedConstruction(project) {
   const values = project.measurements?.values ?? {};
-  const missing = ["diameterCm", "heightCm", "fittingDescription", "gaugeStitchesPer10Cm", "motifRepeatStitches"]
+  const missing = measurementFieldNames
     .filter((key) => values[key] === undefined || values[key] === null || values[key] === "");
   if (!project.measurements?.confirmed || missing.length) {
     throw new ToolError("needs_measurement", "Confirmed frame dimensions, fitting, gauge and motif repeat are required.", 409, { missing });

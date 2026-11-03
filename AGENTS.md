@@ -2,6 +2,10 @@
 
 This repository is the canonical working memory for INA Pattern Studio. Read the smallest relevant file first; do not load every document into a Telegram reply.
 
+For code development, start with `build/README.md`, `build/BUILDER_PROMPT.md` and the next ready ticket in `build/STATUS.md`. The file-based project instructions below describe legacy offline prototypes; the deployed target uses PostgreSQL through the INA service as its sole live project authority. Do not introduce duplicate live JSON/database writes.
+
+The end-to-end target now includes verified-owner-approved Etsy and blog publication. Current runtime restrictions remain until tickets 15–16 implement and verify the controlled publication paths. Coding instructions do not authorize a particular live publication.
+
 ## Retrieval order
 
 1. Read `knowledge/projects/index.json` to locate the active project.

@@ -1,6 +1,6 @@
 # INA execution tracker
 
-This file is the single source of truth for task status and actual results. Strategy, pricing assumptions and decision rules live in [BUSINESS_PLAN.md](BUSINESS_PLAN.md). Update this tracker after each working session or weekly review. Blank actuals mean unknown, not zero.
+This file tracks business tasks and actual results. Software status and priorities live in [SYSTEM_ROADMAP.md](SYSTEM_ROADMAP.md). Strategy, pricing assumptions and decision rules live in [BUSINESS_PLAN.md](BUSINESS_PLAN.md). Blank actuals mean unknown, not zero.
 
 ## Current state
 

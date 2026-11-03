@@ -27,7 +27,16 @@ async function confirmMeasurements(service, projectId) {
     project_id: projectId,
     measurement_version: 1,
     confirmed_by: "ivana",
-    confirmed_values: { diameterCm: 30, heightCm: 20, fittingDescription: "standard drum frame", gaugeStitchesPer10Cm: 14, motifRepeatStitches: 12 }
+    confirmed_values: {
+      diameterCm: 30,
+      heightCm: 20,
+      fittingDescription: "standard drum frame",
+      yarnIdentity: "cotton DK",
+      hookMm: 4,
+      gaugeStitchesPer10Cm: 14,
+      gaugeRowsPer10Cm: 10,
+      motifRepeatStitches: 12
+    }
   });
 }
 
@@ -50,7 +59,7 @@ test("stores provided measurements as unconfirmed and reports missing height", a
     attachments: [{ kind: "photo", content_base64: "aGVsbG8=" }]
   });
   assert.equal(result.measurement_confirmation_required, true);
-  assert.deepEqual(result.missing_fields, ["heightCm", "fittingDescription", "gaugeStitchesPer10Cm", "motifRepeatStitches"]);
+  assert.deepEqual(result.missing_fields, ["heightCm", "fittingDescription", "yarnIdentity", "hookMm", "gaugeStitchesPer10Cm", "gaugeRowsPer10Cm", "motifRepeatStitches"]);
   const project = await service.call("get_project", { project_id: result.project_id });
   assert.equal(project.measurements.confirmed, false);
   assert.equal(project.measurements.status, "UNCONFIRMED");
@@ -81,6 +90,37 @@ test("cleans up staged object-store references when attachment storage fails", a
   assert.equal(repository.telegramEvents.size, 0);
   assert.equal(repository.assets.size, 0);
   assert.equal(stored.length, 0);
+});
+
+test("rejects malformed or incomplete confirmed measurements without changing project state", async () => {
+  const invalidCases = [
+    { label: "missing row gauge", values: { diameterCm: 30, heightCm: 20, fittingDescription: "frame", yarnIdentity: "cotton", hookMm: 4, gaugeStitchesPer10Cm: 14, motifRepeatStitches: 12 } },
+    { label: "zero diameter", values: { diameterCm: 0, heightCm: 20, fittingDescription: "frame", yarnIdentity: "cotton", hookMm: 4, gaugeStitchesPer10Cm: 14, gaugeRowsPer10Cm: 10, motifRepeatStitches: 12 } },
+    { label: "negative hook", values: { diameterCm: 30, heightCm: 20, fittingDescription: "frame", yarnIdentity: "cotton", hookMm: -4, gaugeStitchesPer10Cm: 14, gaugeRowsPer10Cm: 10, motifRepeatStitches: 12 } },
+    { label: "numeric string", values: { diameterCm: "30", heightCm: 20, fittingDescription: "frame", yarnIdentity: "cotton", hookMm: 4, gaugeStitchesPer10Cm: 14, gaugeRowsPer10Cm: 10, motifRepeatStitches: 12 } },
+    { label: "blank fitting", values: { diameterCm: 30, heightCm: 20, fittingDescription: "   ", yarnIdentity: "cotton", hookMm: 4, gaugeStitchesPer10Cm: 14, gaugeRowsPer10Cm: 10, motifRepeatStitches: 12 } },
+    { label: "non-finite gauge", values: { diameterCm: 30, heightCm: 20, fittingDescription: "frame", yarnIdentity: "cotton", hookMm: 4, gaugeStitchesPer10Cm: Infinity, gaugeRowsPer10Cm: 10, motifRepeatStitches: 12 } },
+    { label: "unknown field", values: { diameterCm: 30, heightCm: 20, fittingDescription: "frame", yarnIdentity: "cotton", hookMm: 4, gaugeStitchesPer10Cm: 14, gaugeRowsPer10Cm: 10, motifRepeatStitches: 12, guessed: true } }
+  ];
+  for (const { label, values } of invalidCases) {
+    const service = await makeService();
+    const project = await createProject(service);
+    await assert.rejects(
+      () => service.call("save_measurements", { project_id: project.project_id, measurement_version: 1, confirmed_by: "ivana", confirmed_values: values }),
+      { code: "invalid_measurements" },
+      label
+    );
+    const saved = await service.call("get_project", { project_id: project.project_id });
+    assert.equal(saved.state, "brief", label);
+    assert.equal(saved.measurements.confirmed, false, label);
+  }
+});
+
+test("rejects unsupported or non-numeric partial intake measurements", async () => {
+  const service = await makeService();
+  const input = { message_id: "m-invalid-intake", sender_id: "101", attachments: [{ kind: "photo", content_base64: "aGVsbG8=" }] };
+  await assert.rejects(() => service.call("create_project_from_telegram", { ...input, measurements: { diameterCm: "30" } }), { code: "invalid_measurements" });
+  await assert.rejects(() => service.call("create_project_from_telegram", { ...input, measurements: { unknown: 1 } }), { code: "invalid_measurements" });
 });
 
 test("rejects a non-allowlisted Telegram sender", async () => {

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { confirmedMeasurementsSchema, intakeMeasurementsSchema } from "./measurement-schema.mjs";
 
 const attachment = z.object({
   kind: z.enum(["photo", "sketch", "pdf", "video"]),
@@ -11,13 +12,13 @@ export const toolDefinitions = [
   {
     name: "create_project_from_telegram",
     description: "Create a brief-stage INA project from an allowlisted Telegram message after original attachments have been downloaded.",
-    schema: { message_id: z.string().min(1), sender_id: z.string().min(1), text: z.string().optional(), attachments: z.array(attachment).min(1), measurements: record.optional() }
+    schema: { message_id: z.string().min(1), sender_id: z.string().min(1), text: z.string().optional(), attachments: z.array(attachment).min(1), measurements: intakeMeasurementsSchema.optional() }
   },
   { name: "get_project", description: "Return the compact current context for one INA project.", schema: { project_id: z.string().regex(/^INA-\d+$/) } },
   {
     name: "save_measurements",
     description: "Save Ivana-confirmed construction measurements as the next immutable version.",
-    schema: { project_id: z.string().regex(/^INA-\d+$/), measurement_version: z.number().int().positive(), confirmed_values: record, confirmed_by: z.literal("ivana") }
+    schema: { project_id: z.string().regex(/^INA-\d+$/), measurement_version: z.number().int().positive(), confirmed_values: confirmedMeasurementsSchema, confirmed_by: z.literal("ivana") }
   },
   { name: "find_material_options", description: "List source-backed material options for a project.", schema: { project_id: z.string().regex(/^INA-\d+$/) } },
   {

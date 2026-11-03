@@ -1,5 +1,7 @@
 # INA Hermes build plan
 
+Historical build sequence: use [SYSTEM_ROADMAP.md](../SYSTEM_ROADMAP.md) for current status and priorities. Code development now happens through the user and Codex; Hermes uses the deployed INA tools and repository guidance.
+
 ## Recommended stack
 
 - **Hermes:** conversational agent and tool caller.
