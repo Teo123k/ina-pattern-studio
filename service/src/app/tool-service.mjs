@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import { ToolError, requireValue } from "../domain/errors.mjs";
 import { assertPatternCanBeSaved, compactProject, createProject, releaseGate, validateConstruction } from "../domain/project.mjs";
-import { measurementFieldNames, parseConfirmedMeasurements, parseIntakeMeasurements } from "../contracts/measurement-schema.mjs";
+import { measurementFieldNames, parseConfirmedMeasurements, parseConstructionValidation, parseIntakeMeasurements } from "../contracts/measurement-schema.mjs";
 
 const allowedTools = new Set([
   "create_project_from_telegram", "get_project", "save_measurements", "find_material_options", "save_material_selection", "validate_pattern", "save_pattern_draft", "create_tester_pack", "record_tester_feedback", "check_release_gate", "create_etsy_draft"
@@ -65,12 +65,18 @@ export class InaToolService {
     return compactProject(await this.repository.getProject(project_id));
   }
 
-  async save_measurements({ project_id, measurement_version, confirmed_values, confirmed_by }) {
+  async save_measurements({ project_id, expected_measurement_version, measurement_version, confirmed_values, confirmed_by }) {
     const project = await this.repository.getProject(project_id);
     requireValue(confirmed_by === "ivana", "approval_required", "Measurements must be confirmed by Ivana.", { confirmed_by });
+    requireValue(expected_measurement_version === project.measurements.version, "measurement_version_conflict", "expected_measurement_version must match the current version.", { expected: project.measurements.version });
     requireValue(measurement_version === project.measurements.version + 1, "measurement_version_conflict", "measurement_version must be exactly one greater than the current version.", { expected: project.measurements.version + 1 });
     const parsedMeasurements = parseConfirmedMeasurements(confirmed_values);
-    project.measurements = { version: measurement_version, status: "CONFIRMED", confirmed: true, values: structuredClone(parsedMeasurements), confirmedBy: "ivana", confirmedAt: this.now() };
+    const confirmedAt = this.now();
+    const measurementRecord = { version: measurement_version, status: "CONFIRMED", confirmed: true, values: structuredClone(parsedMeasurements), confirmedBy: "ivana", confirmedAt };
+    project.measurements = { ...measurementRecord, history: [...(project.measurements.history ?? []), structuredClone(measurementRecord)] };
+    if (project.latestValidation) project.validationHistory = [...(project.validationHistory ?? []), structuredClone(project.latestValidation)];
+    project.latestValidation = null;
+    project.release = { ivanaApproval: false, finalPdfPath: null, etsyDraftReviewed: false };
     project.state = "construction";
     await this.repository.saveProject(project, "measurements_confirmed", "ivana");
     return compactProject(project);
@@ -94,18 +100,21 @@ export class InaToolService {
 
   async validate_pattern({ project_id, construction_spec }) {
     const project = await this.repository.getProject(project_id);
-    const result = validateConstruction(project, construction_spec ?? {});
-    project.latestValidation = { ...result, input: construction_spec ?? {}, validatedAt: this.now() };
+    const parsedSpecification = parseConstructionValidation(construction_spec);
+    const result = validateConstruction(project, parsedSpecification);
+    const validation = { id: randomUUID(), ...result, measurementVersion: project.measurements.version, specification: parsedSpecification, validatedAt: this.now() };
+    if (project.latestValidation) project.validationHistory = [...(project.validationHistory ?? []), structuredClone(project.latestValidation)];
+    project.latestValidation = validation;
     if (result.valid) project.state = "construction";
     await this.repository.saveProject(project, result.valid ? "pattern_validated" : "pattern_validation_failed", "system");
-    return { project_id, state: project.state, ...result, next_allowed_action: result.valid ? "Save a not-for-sale pattern draft." : "Adjust the construction and validate again." };
+    return { project_id, state: project.state, validation_id: validation.id, ...result, next_allowed_action: result.valid ? "Save a not-for-sale pattern draft using this validation ID." : "Adjust the construction and validate again." };
   }
 
-  async save_pattern_draft({ project_id, pattern_version, draft }) {
+  async save_pattern_draft({ project_id, pattern_version, validation_id, draft }) {
     const project = await this.repository.getProject(project_id);
-    assertPatternCanBeSaved(project, pattern_version);
+    assertPatternCanBeSaved(project, pattern_version, validation_id);
     requireValue(draft && typeof draft === "object", "invalid_pattern_draft", "A structured pattern draft is required.");
-    project.patterns.push({ version: pattern_version, status: "not_for_sale", draft: structuredClone(draft), createdAt: this.now() });
+    project.patterns.push({ version: pattern_version, status: "not_for_sale", validationId: validation_id, measurementVersion: project.measurements.version, draft: structuredClone(draft), createdAt: this.now() });
     project.state = "pattern_draft";
     await this.repository.saveProject(project, "pattern_draft_saved", "system");
     return compactProject(project);

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { confirmedMeasurementsSchema, intakeMeasurementsSchema } from "./measurement-schema.mjs";
+import { confirmedMeasurementsSchema, constructionValidationSchema, intakeMeasurementsSchema } from "./measurement-schema.mjs";
 
 const attachment = z.object({
   kind: z.enum(["photo", "sketch", "pdf", "video"]),
@@ -18,7 +18,7 @@ export const toolDefinitions = [
   {
     name: "save_measurements",
     description: "Save Ivana-confirmed construction measurements as the next immutable version.",
-    schema: { project_id: z.string().regex(/^INA-\d+$/), measurement_version: z.number().int().positive(), confirmed_values: confirmedMeasurementsSchema, confirmed_by: z.literal("ivana") }
+    schema: { project_id: z.string().regex(/^INA-\d+$/), expected_measurement_version: z.number().int().nonnegative(), measurement_version: z.number().int().positive(), confirmed_values: confirmedMeasurementsSchema, confirmed_by: z.literal("ivana") }
   },
   { name: "find_material_options", description: "List source-backed material options for a project.", schema: { project_id: z.string().regex(/^INA-\d+$/) } },
   {
@@ -29,12 +29,12 @@ export const toolDefinitions = [
   {
     name: "validate_pattern",
     description: "Run deterministic stitch-repeat validation against confirmed measurements.",
-    schema: { project_id: z.string().regex(/^INA-\d+$/), construction_spec: record }
+    schema: { project_id: z.string().regex(/^INA-\d+$/), construction_spec: constructionValidationSchema }
   },
   {
     name: "save_pattern_draft",
     description: "Save a validator-approved, not-for-sale pattern draft.",
-    schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/), draft: record }
+    schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/), validation_id: z.string().uuid(), draft: record }
   },
   {
     name: "create_tester_pack",

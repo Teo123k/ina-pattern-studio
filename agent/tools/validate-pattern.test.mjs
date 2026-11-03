@@ -48,3 +48,12 @@ test("passes only a fully approved release", () => {
   });
   assert.equal(result.valid, true);
 });
+
+test("requires an explicit bounded fit tolerance", () => {
+  const missing = validatePatternConstruction({ frameDiameterCm: 30, gaugeStitchesPer10Cm: 14, motifRepeatStitches: 12 });
+  const excessive = validatePatternConstruction({ frameDiameterCm: 30, gaugeStitchesPer10Cm: 14, motifRepeatStitches: 12, fitTolerancePercent: 11 });
+  assert.equal(missing.valid, false);
+  assert.match(missing.errors[0], /fitTolerancePercent/);
+  assert.equal(excessive.valid, false);
+  assert.match(excessive.errors[0], /must not exceed/);
+});

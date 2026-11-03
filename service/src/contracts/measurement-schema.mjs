@@ -4,6 +4,8 @@ import { ToolError } from "../domain/errors.mjs";
 const positiveNumber = z.number().finite().positive();
 const nonBlankText = z.string().trim().min(1);
 
+export const MAX_FIT_TOLERANCE_PERCENT = 10;
+
 export const confirmedMeasurementFields = {
   diameterCm: positiveNumber,
   heightCm: positiveNumber,
@@ -17,6 +19,10 @@ export const confirmedMeasurementFields = {
 
 export const confirmedMeasurementsSchema = z.object(confirmedMeasurementFields).strict();
 export const intakeMeasurementsSchema = confirmedMeasurementsSchema.partial().strict();
+export const constructionValidationSchema = z.object({
+  measurementVersion: z.number().int().nonnegative(),
+  fitTolerancePercent: z.number().finite().positive().max(MAX_FIT_TOLERANCE_PERCENT)
+}).strict();
 export const measurementFieldNames = Object.freeze(Object.keys(confirmedMeasurementFields));
 
 function parseMeasurements(schema, measurements, message) {
@@ -35,4 +41,8 @@ export function parseIntakeMeasurements(measurements) {
 
 export function parseConfirmedMeasurements(measurements) {
   return parseMeasurements(confirmedMeasurementsSchema, measurements, "Confirmed measurements must include all required positive numeric centimetre/mm values and nonblank text fields.");
+}
+
+export function parseConstructionValidation(specification) {
+  return parseMeasurements(constructionValidationSchema, specification, `Construction validation requires a confirmed measurement version and an explicit fit tolerance between 0 and ${MAX_FIT_TOLERANCE_PERCENT} percent.`);
 }

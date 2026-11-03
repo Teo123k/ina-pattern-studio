@@ -7,8 +7,8 @@ Allowed states: TODO, READY, IN_PROGRESS, NEEDS_REVIEW, BLOCKED_ON_INPUT, DONE. 
 | ID | Task | Dependencies | Status |
 |---|---|---|---|
 | [01](tickets/01.md) | Strict confirmed measurements | None | DONE |
-| [02](tickets/02.md) | Version-bound validation | 01 | READY |
-| [03](tickets/03.md) | Atomic persistence/concurrency | 02 | TODO |
+| [02](tickets/02.md) | Version-bound validation | 01 | DONE |
+| [03](tickets/03.md) | Atomic persistence/concurrency | 02 | READY |
 | [04](tickets/04.md) | Verified actor and approvals | 03 | TODO |
 | [05](tickets/05.md) | Telegram intake/navigation | 04 | TODO |
 | [06](tickets/06.md) | Jobs and operations | 05 | TODO |
@@ -52,3 +52,12 @@ Mock / real integration / physical evidence: Local/in-memory and MCP schema test
 Commit (if created): pending.
 Remaining gate or decision: Ticket 02 must bind validations and drafts to the confirmed measurement version.
 Next ready ticket: 02.
+
+Ticket 02 / 2026-11-03:
+Implementation outcome: Confirmed measurements now retain immutable version history. Validation stores its generated ID, exact resolved inputs, measurement version and result. Pattern drafts must name the current passing validation ID. A measurement update clears the current validation and release flags while retaining history. Validation accepts only the current measurement version plus an explicit tolerance of 0–10%; dimensions/gauge/repeat overrides are rejected.
+Files changed: measurement contract, pattern validator, project/domain service logic, MCP schemas and unit tests.
+Checks actually executed and results: `npm test` — 25 tests passed, 0 failed; `git diff --check` — clean.
+Mock / real integration / physical evidence: Local/in-memory and MCP schema tests only; no live Telegram, PostgreSQL, storage or physical fit evidence.
+Commit (if created): pending.
+Remaining gate or decision: Ticket 03 must make project/media/event records atomic under real PostgreSQL and concurrent delivery.
+Next ready ticket: 03.

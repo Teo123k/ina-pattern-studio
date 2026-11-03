@@ -1,4 +1,5 @@
 const TAU = Math.PI;
+export const MAX_FIT_TOLERANCE_PERCENT = 10;
 
 /**
  * Finds an integer stitch count that works with a motif repeat while staying
@@ -9,7 +10,7 @@ export function validatePatternConstruction({
   frameDiameterCm,
   gaugeStitchesPer10Cm,
   motifRepeatStitches,
-  fitTolerancePercent = 2
+  fitTolerancePercent
 }) {
   const values = { frameDiameterCm, gaugeStitchesPer10Cm, motifRepeatStitches, fitTolerancePercent };
   for (const [name, value] of Object.entries(values)) {
@@ -20,6 +21,9 @@ export function validatePatternConstruction({
   if (!Number.isInteger(motifRepeatStitches)) {
     return { valid: false, errors: ["motifRepeatStitches must be an integer."] };
   }
+  if (fitTolerancePercent > MAX_FIT_TOLERANCE_PERCENT) {
+    return { valid: false, errors: [`fitTolerancePercent must not exceed ${MAX_FIT_TOLERANCE_PERCENT}.`] };
+  }
 
   const circumferenceCm = TAU * frameDiameterCm;
   const targetStitches = circumferenceCm * gaugeStitchesPer10Cm / 10;
@@ -27,7 +31,12 @@ export function validatePatternConstruction({
   const upperBound = targetStitches * (1 + fitTolerancePercent / 100);
   const candidates = [];
 
-  for (let stitches = Math.ceil(lowerBound); stitches <= Math.floor(upperBound); stitches += 1) {
+  const firstCandidate = Math.ceil(lowerBound);
+  const lastCandidate = Math.floor(upperBound);
+  if (lastCandidate - firstCandidate > 10000) {
+    return { valid: false, errors: ["Fit tolerance creates too many candidate stitch counts."], measurements: { circumferenceCm, targetStitches, lowerBound, upperBound } };
+  }
+  for (let stitches = firstCandidate; stitches <= lastCandidate; stitches += 1) {
     if (stitches % motifRepeatStitches === 0) {
       candidates.push({
         stitchCount: stitches,

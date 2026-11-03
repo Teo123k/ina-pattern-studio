@@ -39,6 +39,7 @@ test("MCP server exposes exactly the approved INA tools", async () => {
 test("MCP measurement schemas reject numeric strings and unknown fields", () => {
   const intake = toolDefinitions.find((tool) => tool.name === "create_project_from_telegram");
   const confirm = toolDefinitions.find((tool) => tool.name === "save_measurements");
+  const validate = toolDefinitions.find((tool) => tool.name === "validate_pattern");
   assert.equal(intake.schema.measurements.safeParse({ diameterCm: "30" }).success, false);
   assert.equal(intake.schema.measurements.safeParse({ unknown: 1 }).success, false);
   assert.equal(confirm.schema.confirmed_values.safeParse({
@@ -51,4 +52,7 @@ test("MCP measurement schemas reject numeric strings and unknown fields", () => 
     gaugeRowsPer10Cm: 10,
     motifRepeatStitches: 12
   }).success, true);
+  assert.equal(validate.schema.construction_spec.safeParse({ measurementVersion: 1, fitTolerancePercent: 3 }).success, true);
+  assert.equal(validate.schema.construction_spec.safeParse({ measurementVersion: 1, fitTolerancePercent: 3, motifRepeatStitches: 12 }).success, false);
+  assert.equal(validate.schema.construction_spec.safeParse({ measurementVersion: 1 }).success, false);
 });

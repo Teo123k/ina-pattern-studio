@@ -22,10 +22,11 @@ async function createProject(service) {
   });
 }
 
-async function confirmMeasurements(service, projectId) {
+async function confirmMeasurements(service, projectId, { expectedVersion = 0, measurementVersion = 1, values = {} } = {}) {
   return service.call("save_measurements", {
     project_id: projectId,
-    measurement_version: 1,
+    expected_measurement_version: expectedVersion,
+    measurement_version: measurementVersion,
     confirmed_by: "ivana",
     confirmed_values: {
       diameterCm: 30,
@@ -35,7 +36,8 @@ async function confirmMeasurements(service, projectId) {
       hookMm: 4,
       gaugeStitchesPer10Cm: 14,
       gaugeRowsPer10Cm: 10,
-      motifRepeatStitches: 12
+      motifRepeatStitches: 12,
+      ...values
     }
   });
 }
@@ -106,7 +108,7 @@ test("rejects malformed or incomplete confirmed measurements without changing pr
     const service = await makeService();
     const project = await createProject(service);
     await assert.rejects(
-      () => service.call("save_measurements", { project_id: project.project_id, measurement_version: 1, confirmed_by: "ivana", confirmed_values: values }),
+      () => service.call("save_measurements", { project_id: project.project_id, expected_measurement_version: 0, measurement_version: 1, confirmed_by: "ivana", confirmed_values: values }),
       { code: "invalid_measurements" },
       label
     );
@@ -131,18 +133,19 @@ test("rejects a non-allowlisted Telegram sender", async () => {
 test("blocks construction validation until measurements are confirmed", async () => {
   const service = await makeService();
   const project = await createProject(service);
-  await assert.rejects(() => service.call("validate_pattern", { project_id: project.project_id, construction_spec: {} }), { code: "needs_measurement" });
+  await assert.rejects(() => service.call("validate_pattern", { project_id: project.project_id, construction_spec: { measurementVersion: 0, fitTolerancePercent: 3 } }), { code: "needs_measurement" });
 });
 
 test("rejects an incompatible stitch repeat and permits a valid pattern draft", async () => {
   const service = await makeService();
   const project = await createProject(service);
-  await confirmMeasurements(service, project.project_id);
-  const failed = await service.call("validate_pattern", { project_id: project.project_id, construction_spec: { motifRepeatStitches: 37, fitTolerancePercent: 0.1 } });
+  await confirmMeasurements(service, project.project_id, { values: { motifRepeatStitches: 37 } });
+  const failed = await service.call("validate_pattern", { project_id: project.project_id, construction_spec: { measurementVersion: 1, fitTolerancePercent: 0.1 } });
   assert.equal(failed.valid, false);
-  const passed = await service.call("validate_pattern", { project_id: project.project_id, construction_spec: {} });
+  await confirmMeasurements(service, project.project_id, { expectedVersion: 1, measurementVersion: 2, values: { motifRepeatStitches: 12 } });
+  const passed = await service.call("validate_pattern", { project_id: project.project_id, construction_spec: { measurementVersion: 2, fitTolerancePercent: 3 } });
   assert.equal(passed.valid, true);
-  const saved = await service.call("save_pattern_draft", { project_id: project.project_id, pattern_version: "1.0", draft: { title: "First lampshade", steps: [] } });
+  const saved = await service.call("save_pattern_draft", { project_id: project.project_id, pattern_version: "1.0", validation_id: passed.validation_id, draft: { title: "First lampshade", steps: [] } });
   assert.equal(saved.currentPattern.status, "not_for_sale");
 });
 
@@ -150,8 +153,8 @@ test("holds release and Etsy draft creation until all evidence is present", asyn
   const service = await makeService();
   const project = await createProject(service);
   await confirmMeasurements(service, project.project_id);
-  await service.call("validate_pattern", { project_id: project.project_id, construction_spec: {} });
-  await service.call("save_pattern_draft", { project_id: project.project_id, pattern_version: "1.0", draft: { steps: [] } });
+  const validation = await service.call("validate_pattern", { project_id: project.project_id, construction_spec: { measurementVersion: 1, fitTolerancePercent: 3 } });
+  await service.call("save_pattern_draft", { project_id: project.project_id, pattern_version: "1.0", validation_id: validation.validation_id, draft: { steps: [] } });
   const blocked = await service.call("check_release_gate", { project_id: project.project_id, pattern_version: "1.0" });
   assert.equal(blocked.valid, false);
   await assert.rejects(() => service.call("create_etsy_draft", { project_id: project.project_id, pattern_version: "1.0", listing_payload: { type: "download" } }), { code: "release_gate_blocked" });
@@ -160,4 +163,33 @@ test("holds release and Etsy draft creation until all evidence is present", asyn
 test("refuses tools outside the explicit allowlist", async () => {
   const service = await makeService();
   await assert.rejects(() => service.call("publish_etsy_listing", {}), { code: "tool_not_allowed" });
+});
+
+test("binds validations and pattern drafts to the current immutable measurement version", async () => {
+  const service = await makeService();
+  const project = await createProject(service);
+  await confirmMeasurements(service, project.project_id);
+  const versionOneValidation = await service.call("validate_pattern", { project_id: project.project_id, construction_spec: { measurementVersion: 1, fitTolerancePercent: 3 } });
+  await assert.rejects(
+    () => service.call("validate_pattern", { project_id: project.project_id, construction_spec: { measurementVersion: 1, fitTolerancePercent: 3, motifRepeatStitches: 6 } }),
+    { code: "invalid_measurements" }
+  );
+  await assert.rejects(
+    () => service.call("validate_pattern", { project_id: project.project_id, construction_spec: { measurementVersion: 1, fitTolerancePercent: 11 } }),
+    { code: "invalid_measurements" }
+  );
+  await confirmMeasurements(service, project.project_id, { expectedVersion: 1, measurementVersion: 2, values: { heightCm: 22 } });
+  const afterChange = await service.call("get_project", { project_id: project.project_id });
+  assert.equal(afterChange.measurements.version, 2);
+  assert.equal(afterChange.measurements.history.length, 2);
+  assert.equal(afterChange.measurements.history[0].values.heightCm, 20);
+  assert.equal(afterChange.latestValidation, null);
+  await assert.rejects(
+    () => service.call("save_pattern_draft", { project_id: project.project_id, pattern_version: "1.0", validation_id: versionOneValidation.validation_id, draft: { steps: [] } }),
+    { code: "validation_required" }
+  );
+  await assert.rejects(
+    () => service.call("save_measurements", { project_id: project.project_id, expected_measurement_version: 1, measurement_version: 3, confirmed_by: "ivana", confirmed_values: afterChange.measurements.values }),
+    { code: "measurement_version_conflict" }
+  );
 });

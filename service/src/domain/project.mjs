@@ -14,9 +14,10 @@ export function createProject({ projectId, ownerTelegramId, text, attachments, m
     createdAt: now,
     updatedAt: now,
     source: { text: text ?? "", attachments },
-    measurements: { version: 0, status: "UNCONFIRMED", confirmed: false, values: structuredClone(measurements) },
+    measurements: { version: 0, status: "UNCONFIRMED", confirmed: false, values: structuredClone(measurements), history: [] },
     material: null,
     latestValidation: null,
+    validationHistory: [],
     patterns: [],
     testing: { prototypeCount: 0, testerCount: 0, criticalIssuesOpen: 0 },
     release: { ivanaApproval: false, finalPdfPath: null, etsyDraftReviewed: false },
@@ -36,17 +37,29 @@ export function assertConfirmedConstruction(project) {
 
 export function validateConstruction(project, specification) {
   const values = assertConfirmedConstruction(project);
+  requireValue(specification.measurementVersion === project.measurements.version, "measurement_version_conflict", "Construction validation must use the current confirmed measurement version.", { expected: project.measurements.version });
   const result = validatePatternConstruction({
-    frameDiameterCm: specification.frameDiameterCm ?? values.diameterCm,
-    gaugeStitchesPer10Cm: specification.gaugeStitchesPer10Cm ?? values.gaugeStitchesPer10Cm,
-    motifRepeatStitches: specification.motifRepeatStitches ?? values.motifRepeatStitches,
-    fitTolerancePercent: specification.fitTolerancePercent ?? 2
+    frameDiameterCm: values.diameterCm,
+    gaugeStitchesPer10Cm: values.gaugeStitchesPer10Cm,
+    motifRepeatStitches: values.motifRepeatStitches,
+    fitTolerancePercent: specification.fitTolerancePercent
   });
-  return result;
+  return {
+    ...result,
+    resolvedInput: {
+      measurementVersion: project.measurements.version,
+      frameDiameterCm: values.diameterCm,
+      gaugeStitchesPer10Cm: values.gaugeStitchesPer10Cm,
+      motifRepeatStitches: values.motifRepeatStitches,
+      fitTolerancePercent: specification.fitTolerancePercent
+    }
+  };
 }
 
-export function assertPatternCanBeSaved(project, version) {
+export function assertPatternCanBeSaved(project, version, validationId) {
   requireValue(project.latestValidation?.valid === true, "validation_required", "A passing deterministic construction validation is required.");
+  requireValue(project.latestValidation.measurementVersion === project.measurements.version, "stale_validation", "The successful validation does not match the current measurement version.");
+  requireValue(validationId === project.latestValidation.id, "validation_required", "Pattern draft must name the current successful validation ID.");
   requireValue(typeof version === "string" && /^\d+\.\d+$/.test(version), "invalid_pattern_version", "Pattern version must use major.minor form, for example 1.0.");
   requireValue(!project.patterns.some((pattern) => pattern.version === version), "duplicate_pattern_version", "Pattern version already exists.");
 }
