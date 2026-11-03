@@ -1,0 +1,26 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "IL-YYYY-001",
+  "version": "v0.1-draft",
+  "status": "draft_not_for_sale",
+  "basedOnConfirmedBrief": false,
+  "materials": [],
+  "gauge": {
+    "stitchesPer10Cm": null,
+    "rowsPer10Cm": null,
+    "confirmedByIvana": false
+  },
+  "construction": {
+    "frameDiameterCm": null,
+    "frameHeightCm": null,
+    "motifRepeatStitches": null,
+    "fitTolerancePercent": null,
+    "validatorResultPath": null
+  },
+  "instructions": {
+    "abbreviations": [],
+    "steps": []
+  },
+  "knownRisks": [],
+  "changeLog": []
+}

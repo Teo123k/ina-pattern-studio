@@ -1,0 +1,51 @@
+{
+  "schemaVersion": "1.0",
+  "projectId": "IL-YYYY-001",
+  "title": "Short original design name",
+  "state": "brief",
+  "createdAt": "YYYY-MM-DDTHH:MM:SSZ",
+  "updatedAt": "YYYY-MM-DDTHH:MM:SSZ",
+  "source": {
+    "telegram": {
+      "chatId": "stored-outside-git-or-redacted",
+      "messageIds": [],
+      "mediaReferences": []
+    },
+    "originalityConfirmedByIvana": false
+  },
+  "brief": {
+    "style": { "value": null, "status": "UNCONFIRMED", "source": null },
+    "frameDiameterCm": { "value": null, "status": "UNCONFIRMED", "source": null },
+    "frameHeightCm": { "value": null, "status": "UNCONFIRMED", "source": null },
+    "fittingType": { "value": null, "status": "UNCONFIRMED", "source": null },
+    "bulbAndHeatCheck": { "value": null, "status": "BLOCKED", "source": null }
+  },
+  "material": {
+    "materialId": null,
+    "selectedByIvana": false,
+    "gaugeStitchesPer10Cm": null,
+    "gaugeRowsPer10Cm": null,
+    "gaugeStatus": "UNCONFIRMED"
+  },
+  "concept": {
+    "selectedConceptId": null,
+    "selectionConfirmedByIvana": false
+  },
+  "pattern": {
+    "currentVersion": null,
+    "validatorReportPath": null,
+    "status": "not_started"
+  },
+  "testing": {
+    "prototypeCount": 0,
+    "testerCount": 0,
+    "criticalIssuesOpen": 0,
+    "feedbackReferences": []
+  },
+  "release": {
+    "ivanaApproval": false,
+    "finalPdfPath": null,
+    "etsyDraftReviewed": false
+  },
+  "nextAllowedAction": "Confirm the project brief."
+}

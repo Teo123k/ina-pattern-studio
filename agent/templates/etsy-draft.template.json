@@ -1,0 +1,19 @@
+{
+  "state": "draft",
+  "type": "download",
+  "title": "[REVIEW REQUIRED] INA 01 Crochet Lampshade Pattern",
+  "description": "DIGITAL CROCHET PATTERN ONLY. No finished lampshade, lamp base, bulb, frame, yarn, hook, or other physical materials are included.\n\n[Insert tested skill level, exact supported frame dimensions, yarn, hook, gauge, terminology and pattern-version details.]\n\nThis listing must be reviewed and approved by Ivana before a draft is created. Publication is a separate explicit action.",
+  "price_gbp": null,
+  "quantity": 999,
+  "who_made": "i_did",
+  "when_made": "made_to_order",
+  "taxonomy_id": null,
+  "tags": [],
+  "digital_file": "[approved-versioned-pattern.pdf]",
+  "approval": {
+    "ivana_approved_at": null,
+    "pattern_version": null,
+    "etsy_draft_reviewed_at": null,
+    "publication_authorised_at": null
+  }
+}

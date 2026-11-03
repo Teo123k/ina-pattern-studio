@@ -1,0 +1,26 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "INA Pattern Studio release evidence",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "design_id",
+    "pattern_version",
+    "ivana_approval",
+    "prototype_count",
+    "tester_count",
+    "critical_issues_open",
+    "pdf_path",
+    "etsy_draft_reviewed"
+  ],
+  "properties": {
+    "design_id": { "type": "string", "pattern": "^INA-[0-9]{2,}$" },
+    "pattern_version": { "type": "string", "pattern": "^[0-9]+\\.[0-9]+$" },
+    "ivana_approval": { "const": true },
+    "prototype_count": { "type": "integer", "minimum": 2 },
+    "tester_count": { "type": "integer", "minimum": 3 },
+    "critical_issues_open": { "const": 0 },
+    "pdf_path": { "type": "string", "minLength": 5 },
+    "etsy_draft_reviewed": { "const": true }
+  }
+}

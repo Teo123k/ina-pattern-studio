@@ -1,0 +1,12 @@
+# Credentials and local runtime state
+.env
+.env.*
+!.env.example
+service/.local-media/
+node_modules/
+coverage/
+.DS_Store
+
+# Source media and generated outputs belong in object storage, not Git.
+media/
+exports/
