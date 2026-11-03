@@ -4,7 +4,7 @@ import { assertPatternCanBeSaved, compactProject, createProject, releaseGate, va
 import { measurementFieldNames, parseConfirmedMeasurements, parseConstructionValidation, parseIntakeMeasurements } from "../contracts/measurement-schema.mjs";
 
 const allowedTools = new Set([
-  "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "prepare_approval", "save_measurements", "find_material_options", "save_material_selection", "validate_pattern", "save_pattern_draft", "create_tester_pack", "record_tester_feedback", "check_release_gate", "create_etsy_draft"
+  "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "save_material_selection", "validate_pattern", "save_pattern_draft", "create_tester_pack", "record_tester_feedback", "check_release_gate", "create_etsy_draft"
 ]);
 
 export class InaToolService {
@@ -95,6 +95,16 @@ export class InaToolService {
     if (!project) return { chat_id: String(chat_id), selected: false, next_action: "Choose a project or send /new with a source image." };
     return { project_id: project.id, state: project.state, selected: true, next_action: project.measurements?.confirmed ? "Continue the current project." : "Confirm measurements." };
   }
+
+  async enqueue_job({ idempotency_key, kind, payload = {}, max_attempts = 3 }) {
+    requireValue(typeof idempotency_key === "string" && idempotency_key.length <= 200, "invalid_job", "A bounded idempotency key is required.");
+    requireValue(typeof kind === "string" && kind.length <= 100, "invalid_job", "A bounded job kind is required.");
+    requireValue(Number.isInteger(max_attempts) && max_attempts > 0 && max_attempts <= 5, "invalid_job", "max_attempts must be between 1 and 5.");
+    return this.repository.enqueueJob({ id: randomUUID(), idempotencyKey: idempotency_key, kind, payload, maxAttempts: max_attempts });
+  }
+
+  async get_job({ job_id }) { return this.repository.getJob(job_id); }
+  async cancel_job({ job_id }) { return this.repository.cancelJob(job_id); }
 
   async prepare_approval({ project_id, operation, subject }) {
     requireValue(this.approvalSecret, "approval_not_configured", "Approval callbacks are not configured.", undefined);

@@ -13,6 +13,7 @@ const mediaDir = resolve(process.env.LOCAL_MEDIA_DIR ?? "service/.local-media");
 const allowedTelegramIds = (process.env.ALLOWED_TELEGRAM_IDS ?? "").split(",").map((item) => item.trim()).filter(Boolean);
 const apiKey = process.env.SERVICE_API_KEY;
 const approvalSecret = process.env.TELEGRAM_APPROVAL_SECRET;
+const MAX_BODY_BYTES = 1024 * 1024;
 if (process.env.NODE_ENV === "production" && (!apiKey || !approvalSecret || allowedTelegramIds.length === 0)) {
   throw new Error("SERVICE_API_KEY, TELEGRAM_APPROVAL_SECRET and ALLOWED_TELEGRAM_IDS are required in production.");
 }
@@ -39,7 +40,8 @@ function send(response, status, body) {
 
 async function bodyOf(request) {
   const chunks = [];
-  for await (const chunk of request) chunks.push(chunk);
+  let size = 0;
+  for await (const chunk of request) { size += chunk.length; if (size > MAX_BODY_BYTES) throw new ToolError("request_too_large", "Request body exceeds the 1 MB limit.", 413); chunks.push(chunk); }
   const raw = Buffer.concat(chunks).toString("utf8");
   return raw ? JSON.parse(raw) : {};
 }
@@ -47,6 +49,10 @@ async function bodyOf(request) {
 const server = createServer(async (request, response) => {
   try {
     if (request.method === "GET" && request.url === "/health") return send(response, 200, { ok: true });
+    if (request.method === "GET" && request.url === "/ready") {
+      if (typeof repository.listMaterials === "function") await repository.listMaterials();
+      return send(response, 200, { ok: true });
+    }
     if (request.method === "POST" && request.url === "/v1/gateway/telegram-callback") {
       if (!apiKey || request.headers.authorization !== `Bearer ${apiKey}`) return send(response, 401, { error: { code: "unauthorized" } });
       const result = await service.approve_gateway_callback(await bodyOf(request));
@@ -60,7 +66,7 @@ const server = createServer(async (request, response) => {
   } catch (error) {
     if (error instanceof ToolError) return send(response, error.status, { ok: false, error: { code: error.code, message: error.message, details: error.details } });
     if (error instanceof SyntaxError) return send(response, 400, { ok: false, error: { code: "invalid_json", message: "Request body must be JSON." } });
-    console.error(error);
+    console.error(error instanceof Error ? error.name : "internal_error");
     return send(response, 500, { ok: false, error: { code: "internal_error", message: "Internal service error." } });
   }
 });

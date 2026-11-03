@@ -68,6 +68,18 @@ test("lists, selects and resumes projects within the owner chat", async () => {
   await assert.rejects(() => service.call("select_project", { chat_id: "other-chat", project_id: project.project_id }), { code: "project_not_found" });
 });
 
+test("deduplicates jobs and supports retry and cancellation", async () => {
+  const service = await makeService();
+  const first = await service.call("enqueue_job", { idempotency_key: "content:INA-1:v1", kind: "content", payload: { project_id: "INA-1" } });
+  const duplicate = await service.call("enqueue_job", { idempotency_key: "content:INA-1:v1", kind: "content", payload: { project_id: "INA-1" } });
+  assert.equal(duplicate.id, first.id);
+  const claimed = await service.repository.claimJob("content");
+  assert.equal(claimed.status, "running");
+  await service.repository.failJob(claimed.id, "provider unavailable");
+  assert.equal((await service.call("get_job", { job_id: claimed.id })).status, "queued");
+  assert.equal((await service.call("cancel_job", { job_id: claimed.id })).status, "cancelled");
+});
+
 test("consumes only one verified owner approval for the exact action", async () => {
   const service = await makeService();
   const project = await createProject(service);

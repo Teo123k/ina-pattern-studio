@@ -4,8 +4,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "start": "node service/src/server.mjs",
-    "dev": "node --watch service/src/server.mjs",
+    "start": "node --env-file-if-exists=service/.env service/src/server.mjs",
+    "dev": "node --env-file-if-exists=service/.env --watch service/src/server.mjs",
     "mcp": "node service/src/mcp-server.mjs",
     "test": "node --test agent/tools/validate-pattern.test.mjs tools/build-project-context.test.mjs service/test/**/*.test.mjs",
     "migrate": "node service/src/migrate.mjs",

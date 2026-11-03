@@ -23,6 +23,18 @@ It refuses database names that do not end in `_test` before truncating test tabl
 
 The current HTTP service intentionally binds to `127.0.0.1`. Put it behind an authenticated private gateway before exposing it to Hermes on another host.
 
+`/health` checks process liveness. `/ready` checks repository readiness. Request bodies are limited to 1 MB and internal errors are logged without request payloads.
+
+For a test database backup and restore drill:
+
+```sh
+pg_dump "$DATABASE_URL" --format=custom --file=/tmp/ina-test.dump
+createdb ina_pattern_studio_restore_test
+pg_restore --clean --if-exists --dbname=ina_pattern_studio_restore_test /tmp/ina-test.dump
+```
+
+Keep backup files private and remove them after the drill. Run the service under a supervisor such as systemd or PM2, with restart-on-failure and the environment file loaded by the start command.
+
 ## HTTP contract
 
 `POST /v1/tools/<approved-tool-name>` accepts JSON and, if configured, requires `Authorization: Bearer $SERVICE_API_KEY`.

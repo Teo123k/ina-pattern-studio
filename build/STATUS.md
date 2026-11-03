@@ -11,8 +11,8 @@ Allowed states: TODO, READY, IN_PROGRESS, NEEDS_REVIEW, BLOCKED_ON_INPUT, DONE. 
 | [03](tickets/03.md) | Atomic persistence/concurrency | 02 | DONE |
 | [04](tickets/04.md) | Verified actor and approvals | 03 | DONE |
 | [05](tickets/05.md) | Telegram intake/navigation | 04 | DONE |
-| [06](tickets/06.md) | Jobs and operations | 05 | READY |
-| [07](tickets/07.md) | Materials and frame | 06 | TODO |
+| [06](tickets/06.md) | Jobs and operations | 05 | DONE |
+| [07](tickets/07.md) | Materials and frame | 06 | READY |
 | [08](tickets/08.md) | Design concepts | 07 | TODO |
 | [09](tickets/09.md) | Structured pattern generation | 08 | TODO |
 | [10](tickets/10.md) | PDF and making guidance | 09 | TODO |
@@ -97,3 +97,12 @@ Mock / real integration / physical evidence: Synthetic Telegram mapping tests co
 Commit (if created): pending.
 Remaining gate or decision: Ticket 06 adds durable jobs and operational recovery.
 Next ready ticket: 06.
+
+Ticket 06 / 2026-11-03:
+Implementation outcome: Added durable idempotent jobs with bounded attempts, claiming, retry, cancellation and result storage across memory/PostgreSQL repositories. Added 1 MB request limits, `/ready` repository checks, redacted internal error logging, environment-file startup commands, migration 004 and backup/restore instructions.
+Files changed: jobs migration/repositories/service tools, server runtime, package scripts, service README and tests.
+Checks actually executed and results: `npm test` — 33 passed, 0 failed, 1 skipped without a database URL; `git diff --check` — clean. Ticket 05 PostgreSQL integration remained green before the jobs migration was added.
+Mock / real integration / physical evidence: Memory job tests cover duplicate enqueue, retry and cancellation. PostgreSQL job migration is included but a fresh integration run after migration 004 is pending.
+Commit (if created): pending.
+Remaining gate or decision: A production worker process and credentialed backup restore remain deployment operations. Ticket 07 is ready for source-backed materials and frame records.
+Next ready ticket: 07.

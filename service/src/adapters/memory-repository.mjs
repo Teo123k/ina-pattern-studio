@@ -9,6 +9,8 @@ export class MemoryRepository {
     this.events = [];
     this.intakeTail = Promise.resolve();
     this.activeProjects = new Map();
+    this.jobs = new Map();
+    this.jobsByKey = new Map();
   }
 
   async getProject(id) {
@@ -90,6 +92,27 @@ export class MemoryRepository {
     const projectId = this.activeProjects.get(String(chatId));
     return projectId ? this.getProject(projectId) : null;
   }
+
+  async enqueueJob({ id, idempotencyKey, kind, payload, maxAttempts = 3 }) {
+    const existingId = this.jobsByKey.get(idempotencyKey);
+    if (existingId) return structuredClone(this.jobs.get(existingId));
+    const job = { id, idempotencyKey, kind, payload: structuredClone(payload), status: "queued", attempts: 0, maxAttempts, createdAt: new Date().toISOString(), updatedAt: new Date().toISOString() };
+    this.jobs.set(id, job); this.jobsByKey.set(idempotencyKey, id);
+    return structuredClone(job);
+  }
+
+  async getJob(id) { const job = this.jobs.get(id); if (!job) throw new ToolError("job_not_found", "Job was not found.", 404); return structuredClone(job); }
+
+  async claimJob(kind) {
+    const job = [...this.jobs.values()].find((item) => item.status === "queued" && (!kind || item.kind === kind));
+    if (!job) return null;
+    job.status = "running"; job.attempts += 1; job.updatedAt = new Date().toISOString();
+    return structuredClone(job);
+  }
+
+  async completeJob(id, result) { const job = await this.getJob(id); job.status = "succeeded"; job.result = structuredClone(result); job.updatedAt = new Date().toISOString(); this.jobs.set(id, job); return structuredClone(job); }
+  async failJob(id, error) { const job = await this.getJob(id); job.status = job.attempts < job.maxAttempts ? "queued" : "failed"; job.lastError = String(error).slice(0, 500); job.updatedAt = new Date().toISOString(); this.jobs.set(id, job); return structuredClone(job); }
+  async cancelJob(id) { const job = await this.getJob(id); if (["queued", "running"].includes(job.status)) job.status = "cancelled"; job.updatedAt = new Date().toISOString(); this.jobs.set(id, job); return structuredClone(job); }
 }
 
 function telegramEventKey({ botId, chatId, messageId }) {

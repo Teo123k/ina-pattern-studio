@@ -105,6 +105,16 @@ export class PostgresRepository {
     return result.rowCount ? this.getProject(result.rows[0].project_id) : null;
   }
 
+  async enqueueJob({ id, idempotencyKey, kind, payload, maxAttempts = 3 }) {
+    const result = await this.pool.query(`INSERT INTO jobs (id, idempotency_key, kind, payload, status, max_attempts) VALUES ($1,$2,$3,$4::jsonb,'queued',$5) ON CONFLICT (idempotency_key) DO UPDATE SET id = jobs.id RETURNING *`, [id, idempotencyKey, kind, JSON.stringify(payload), maxAttempts]);
+    return mapJob(result.rows[0]);
+  }
+  async getJob(id) { const result = await this.pool.query("SELECT * FROM jobs WHERE id=$1", [id]); if (!result.rowCount) throw new ToolError("job_not_found", "Job was not found.", 404); return mapJob(result.rows[0]); }
+  async claimJob(kind) { const result = await this.pool.query(`WITH candidate AS (SELECT id FROM jobs WHERE status='queued' AND ($1::text IS NULL OR kind=$1) AND available_at <= now() ORDER BY created_at FOR UPDATE SKIP LOCKED LIMIT 1) UPDATE jobs SET status='running', attempts=attempts+1, updated_at=now() WHERE id IN (SELECT id FROM candidate) RETURNING *`, [kind ?? null]); return result.rowCount ? mapJob(result.rows[0]) : null; }
+  async completeJob(id, value) { const result = await this.pool.query("UPDATE jobs SET status='succeeded', result=$2::jsonb, updated_at=now() WHERE id=$1 RETURNING *", [id, JSON.stringify(value)]); if (!result.rowCount) throw new ToolError("job_not_found", "Job was not found.", 404); return mapJob(result.rows[0]); }
+  async failJob(id, error) { const result = await this.pool.query("UPDATE jobs SET status=CASE WHEN attempts < max_attempts THEN 'queued' ELSE 'failed' END, last_error=$2, updated_at=now() WHERE id=$1 RETURNING *", [id, String(error).slice(0,500)]); if (!result.rowCount) throw new ToolError("job_not_found", "Job was not found.", 404); return mapJob(result.rows[0]); }
+  async cancelJob(id) { const result = await this.pool.query("UPDATE jobs SET status=CASE WHEN status IN ('queued','running') THEN 'cancelled' ELSE status END, updated_at=now() WHERE id=$1 RETURNING *", [id]); if (!result.rowCount) throw new ToolError("job_not_found", "Job was not found.", 404); return mapJob(result.rows[0]); }
+
   async close() {
     await this.pool.end();
   }
@@ -137,4 +147,8 @@ export class PostgresRepository {
       client.release(discardClient);
     }
   }
+}
+
+function mapJob(row, result) {
+  return { id: row.id, idempotencyKey: row.idempotency_key, kind: row.kind, payload: row.payload, status: row.status, attempts: row.attempts, maxAttempts: row.max_attempts, lastError: row.last_error, result: result ?? row.result, createdAt: row.created_at, updatedAt: row.updated_at };
 }
