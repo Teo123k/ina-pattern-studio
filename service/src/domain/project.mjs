@@ -5,7 +5,7 @@ export const PROJECT_STATES = new Set([
   "brief", "construction", "pattern_draft", "prototype", "tester_review", "release_candidate", "approved", "etsy_draft_created"
 ]);
 
-export function createProject({ projectId, ownerTelegramId, text, attachments, now }) {
+export function createProject({ projectId, ownerTelegramId, text, attachments, measurements = {}, now }) {
   return {
     id: projectId,
     state: "brief",
@@ -13,7 +13,7 @@ export function createProject({ projectId, ownerTelegramId, text, attachments, n
     createdAt: now,
     updatedAt: now,
     source: { text: text ?? "", attachments },
-    measurements: { version: 0, confirmed: false, values: {} },
+    measurements: { version: 0, status: "UNCONFIRMED", confirmed: false, values: structuredClone(measurements) },
     material: null,
     latestValidation: null,
     patterns: [],

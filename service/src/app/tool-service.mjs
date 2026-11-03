@@ -20,33 +20,45 @@ export class InaToolService {
     return this[toolName](input);
   }
 
-  async create_project_from_telegram({ message_id, sender_id, text = "", attachments = [] }) {
+  async create_project_from_telegram(input = {}) {
+    requireValue(input && typeof input === "object" && !Array.isArray(input), "invalid_payload", "Telegram intake payload must be an object.");
+    const { message_id, sender_id, text = "", attachments = [], measurements = {} } = input;
     requireValue(message_id, "invalid_message", "message_id is required.");
     requireValue(this.allowedTelegramIds.has(String(sender_id)), "sender_not_allowed", "This Telegram account is not allowed to use INA.");
     const existing = await this.repository.findTelegramEvent(message_id);
     if (existing) return { ...existing.result, duplicate: true };
     requireValue(Array.isArray(attachments) && attachments.length > 0, "missing_attachment", "At least one source attachment is required.");
+    requireValue(measurements && typeof measurements === "object" && !Array.isArray(measurements), "invalid_measurements", "Measurements must be an object.");
     const projectId = `INA-${Date.now()}${Math.floor(Math.random() * 1000)}`;
     const now = this.now();
     const storedAssets = [];
-    for (const attachment of attachments) {
-      requireValue(["photo", "sketch", "pdf", "video"].includes(attachment.kind), "invalid_attachment", "Attachment kind must be photo, sketch, pdf or video.");
-      const stored = await this.objectStore.store({ projectId, messageId: message_id, kind: attachment.kind, contentBase64: attachment.content_base64 });
-      const asset = { id: randomUUID(), projectId, messageId: String(message_id), kind: attachment.kind, ...stored, createdAt: now };
-      await this.repository.storeAsset(asset);
-      storedAssets.push(asset);
+    try {
+      for (const attachment of attachments) {
+        requireValue(attachment && typeof attachment === "object" && !Array.isArray(attachment), "invalid_attachment", "Each attachment must be an object.");
+        requireValue(["photo", "sketch", "pdf", "video"].includes(attachment.kind), "invalid_attachment", "Attachment kind must be photo, sketch, pdf or video.");
+        const stored = await this.objectStore.store({ projectId, messageId: message_id, kind: attachment.kind, contentBase64: attachment.content_base64 });
+        storedAssets.push({ id: randomUUID(), projectId, messageId: String(message_id), kind: attachment.kind, ...stored, createdAt: now });
+      }
+      for (const asset of storedAssets) await this.repository.storeAsset(asset);
+      const project = createProject({ projectId, ownerTelegramId: sender_id, text, attachments: storedAssets, measurements, now });
+      await this.repository.saveProject(project, "project_created", String(sender_id));
+      const requiredFields = ["diameterCm", "heightCm", "fittingDescription", "gaugeStitchesPer10Cm", "motifRepeatStitches"];
+      const missingFields = requiredFields.filter((key) => measurements[key] === undefined || measurements[key] === null || measurements[key] === "");
+      const result = {
+        project_id: projectId,
+        state: project.state,
+        measurement_confirmation_required: true,
+        missing_fields: missingFields,
+        next_allowed_action: "Confirm frame dimensions, fitting, gauge and motif repeat."
+      };
+      await this.repository.saveTelegramEvent(message_id, { result, senderId: String(sender_id), checksum: createHash("sha256").update(JSON.stringify({ text, attachments, measurements })).digest("hex"), receivedAt: now });
+      return result;
+    } catch (error) {
+      if (typeof this.objectStore.remove === "function") {
+        for (const asset of storedAssets) await this.objectStore.remove(asset);
+      }
+      throw error;
     }
-    const project = createProject({ projectId, ownerTelegramId: sender_id, text, attachments: storedAssets, now });
-    await this.repository.saveProject(project, "project_created", String(sender_id));
-    const result = {
-      project_id: projectId,
-      state: project.state,
-      measurement_confirmation_required: true,
-      missing_fields: ["diameterCm", "heightCm", "fittingDescription", "gaugeStitchesPer10Cm", "motifRepeatStitches"],
-      next_allowed_action: "Confirm frame dimensions, fitting, gauge and motif repeat."
-    };
-    await this.repository.saveTelegramEvent(message_id, { result, senderId: String(sender_id), checksum: createHash("sha256").update(JSON.stringify({ text, attachments })).digest("hex"), receivedAt: now });
-    return result;
   }
 
   async get_project({ project_id }) {
@@ -60,7 +72,7 @@ export class InaToolService {
     for (const key of ["diameterCm", "heightCm", "fittingDescription", "gaugeStitchesPer10Cm", "motifRepeatStitches"]) {
       requireValue(confirmed_values?.[key] !== undefined && confirmed_values[key] !== null && confirmed_values[key] !== "", "missing_measurement", `${key} is required for confirmation.`);
     }
-    project.measurements = { version: measurement_version, confirmed: true, values: structuredClone(confirmed_values), confirmedBy: "ivana", confirmedAt: this.now() };
+    project.measurements = { version: measurement_version, status: "CONFIRMED", confirmed: true, values: structuredClone(confirmed_values), confirmedBy: "ivana", confirmedAt: this.now() };
     project.state = "construction";
     await this.repository.saveProject(project, "measurements_confirmed", "ivana");
     return compactProject(project);

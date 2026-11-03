@@ -40,6 +40,49 @@ test("creates an internal project and deduplicates Telegram delivery", async () 
   assert.equal(second.project_id, first.project_id);
 });
 
+test("stores provided measurements as unconfirmed and reports missing height", async () => {
+  const service = await makeService();
+  const result = await service.call("create_project_from_telegram", {
+    message_id: "m-measurements",
+    sender_id: "101",
+    text: "Diameter 30 cm",
+    measurements: { diameterCm: 30 },
+    attachments: [{ kind: "photo", content_base64: "aGVsbG8=" }]
+  });
+  assert.equal(result.measurement_confirmation_required, true);
+  assert.deepEqual(result.missing_fields, ["heightCm", "fittingDescription", "gaugeStitchesPer10Cm", "motifRepeatStitches"]);
+  const project = await service.call("get_project", { project_id: result.project_id });
+  assert.equal(project.measurements.confirmed, false);
+  assert.equal(project.measurements.status, "UNCONFIRMED");
+  assert.equal(project.measurements.values.diameterCm, 30);
+});
+
+test("cleans up staged object-store references when attachment storage fails", async () => {
+  const repository = new MemoryRepository();
+  const stored = [];
+  const objectStore = {
+    async store(input) {
+      if (input.kind === "sketch") throw new Error("object storage unavailable");
+      const reference = { storageKey: `${input.projectId}/${input.messageId}/${input.kind}`, checksum: "checksum" };
+      stored.push(reference);
+      return reference;
+    },
+    async remove(reference) {
+      stored.splice(stored.findIndex((item) => item.storageKey === reference.storageKey), 1);
+    }
+  };
+  const service = new InaToolService({ repository, objectStore, allowedTelegramIds: ["101"] });
+  await assert.rejects(() => service.call("create_project_from_telegram", {
+    message_id: "m-storage-failure",
+    sender_id: "101",
+    attachments: [{ kind: "photo", content_base64: "aA==" }, { kind: "sketch", content_base64: "eA==" }]
+  }), /object storage unavailable/);
+  assert.equal(repository.projects.size, 0);
+  assert.equal(repository.telegramEvents.size, 0);
+  assert.equal(repository.assets.size, 0);
+  assert.equal(stored.length, 0);
+});
+
 test("rejects a non-allowlisted Telegram sender", async () => {
   const service = await makeService();
   await assert.rejects(() => service.call("create_project_from_telegram", { message_id: "m-2", sender_id: "999", attachments: [{ kind: "photo" }] }), { code: "sender_not_allowed" });

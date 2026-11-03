@@ -1,4 +1,4 @@
-import { PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { createHash, randomUUID } from "node:crypto";
 
 export class S3ObjectStore {
@@ -19,5 +19,9 @@ export class S3ObjectStore {
     const checksum = createHash("sha256").update(body).digest("hex");
     await this.client.send(new PutObjectCommand({ Bucket: this.bucket, Key: key, Body: body, Metadata: { sha256: checksum } }));
     return { storageKey: key, checksum };
+  }
+
+  async remove({ storageKey }) {
+    await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: storageKey }));
   }
 }
