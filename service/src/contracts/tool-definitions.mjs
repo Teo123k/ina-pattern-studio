@@ -22,7 +22,7 @@ export const toolDefinitions = [
   { name: "enqueue_job", description: "Queue a retry-safe internal job with an idempotency key.", schema: { idempotency_key: z.string().min(1).max(200), kind: z.string().min(1).max(100), payload: record.optional(), max_attempts: z.number().int().min(1).max(5).optional() } },
   { name: "get_job", description: "Read the status of an internal job.", schema: { job_id: z.string().uuid() } },
   { name: "cancel_job", description: "Cancel a queued or running internal job.", schema: { job_id: z.string().uuid() } },
-  { name: "prepare_approval", description: "Prepare a one-time Ivana Telegram confirmation for an exact project action. This does not approve or execute the action.", schema: { project_id: z.string().regex(/^INA-\d+$/), operation: z.enum(["confirm_measurements", "select_material", "select_concept", "create_tester_pack", "approve_release"]), subject: record } },
+  { name: "prepare_approval", description: "Prepare a one-time Ivana Telegram confirmation for an exact project action. This does not approve or execute the action.", schema: { project_id: z.string().regex(/^INA-\d+$/), operation: z.enum(["confirm_measurements", "select_material", "select_concept", "create_tester_pack", "approve_release", "publish_etsy"]), subject: record } },
   {
     name: "save_measurements",
     description: "Save Ivana-confirmed construction measurements as the next immutable version.",
@@ -76,5 +76,6 @@ export const toolDefinitions = [
     name: "create_etsy_draft",
     description: "Create a reviewable digital Etsy draft only after all release gates pass. It cannot publish a listing.",
     schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/), listing_payload: record }
-  }
+  },
+  { name: "publish_etsy_listing", description: "Activate one exact Etsy draft after verified owner approval and final readback.", schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/), listing_id: z.string().min(1), price: z.number().nonnegative(), currency: z.string().length(3), approval_id: approval.shape.approval_id } }
 ];

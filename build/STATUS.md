@@ -20,10 +20,10 @@ Allowed states: TODO, READY, IN_PROGRESS, NEEDS_REVIEW, BLOCKED_ON_INPUT, DONE. 
 | [12](tickets/12.md) | Content packages | 11 | DONE |
 | [13](tickets/13.md) | Video render | 12 | DONE |
 | [14](tickets/14.md) | Real Etsy drafts | 12 | DONE |
-| [15](tickets/15.md) | Approved Etsy publication | 14, 04 | READY |
-| [16](tickets/16.md) | Blog publication | 12, 15 | TODO |
-| [17](tickets/17.md) | Usage limits/recovery | 06, 12 | TODO |
-| [18](tickets/18.md) | Complete Ivana pilot | 01–17 | TODO |
+| [15](tickets/15.md) | Approved Etsy publication | 14, 04 | DONE |
+| [16](tickets/16.md) | Blog publication | 12, 15 | BLOCKED_ON_INPUT |
+| [17](tickets/17.md) | Usage limits/recovery | 06, 12 | IN_PROGRESS |
+| [18](tickets/18.md) | Complete Ivana pilot | 01–17 | BLOCKED_ON_INPUT |
 
 ## Evidence entry template
 
@@ -178,3 +178,21 @@ Mock / real integration / physical evidence: PDF header, retrieval and tester-la
 Commit (if created): pending.
 Remaining gate or decision: Ticket 11 replaces aggregate testing counters with version-bound maker/tester evidence and release approval.
 Next ready ticket: 11.
+
+Ticket 15 / 2026-11-03:
+Implementation outcome: Added an explicit `publish_etsy_listing` action that requires the release gate, the recorded Etsy draft identity, a one-time verified Ivana approval bound to listing ID, price, currency and draft fingerprint, and a final Etsy readback confirming the listing is active. Publication records a live URL and moves the project to `published`; no credentials or network call are used by tests.
+Files changed: Etsy adapter publication method, tool service/contract, MCP registry test, adapter tests and this ledger.
+Checks actually executed and results: `npm test` — 44 passed, 0 failed, 1 skipped without a database URL; `git diff --check` — clean.
+Mock / real integration / physical evidence: Mock Etsy responses cover active readback and price-mismatch blocking. No live Etsy publication was run because shop credentials and explicit live publication authorization are not present.
+Commit (if created): pending.
+Remaining gate or decision: Ticket 16 cannot be implemented safely without a selected blog CMS, endpoint contract and credentials. The repository can continue generating reviewable blog drafts but must not guess a publication target.
+Next ready ticket: Ticket 17 (usage limits/recovery) can proceed independently.
+
+Ticket 17 / 2026-11-03:
+Implementation outcome: Added a bounded usage meter with estimated-cost records, task and monthly budget checks, source-version/settings cache keys, maximum-attempt metadata, pause/resume recovery, plain-language help and monthly summaries. Existing status and cached outputs remain available when paid generation is blocked.
+Files changed: `service/src/usage/usage-meter.mjs`, usage tests and `package.json`.
+Checks actually executed and results: `npm test` — 46 passed, 0 failed, 1 skipped without a database URL; `git diff --check` — clean.
+Mock / real integration / physical evidence: Usage behavior is unit-tested in memory. Persistence across restart, production model billing reconciliation, Telegram Help/Pause routing and backup restoration remain unverified because no model provider or production deployment is connected here.
+Commit (if created): pending.
+Remaining gate or decision: Wire the meter to a durable usage table and the actual worker/provider before calling this ticket complete.
+Next ready ticket: Ticket 18 is blocked until Ivana supplies a live Telegram pilot, real source media, physical tester evidence, CMS choice and optional Etsy credentials.

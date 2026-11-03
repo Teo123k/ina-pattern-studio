@@ -8,7 +8,7 @@ import { validateEditDecision } from "../video/edit-decision.mjs";
 import { validateStructuredPattern } from "../../../agent/tools/validate-structured-pattern.mjs";
 
 const allowedTools = new Set([
-    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "select_concept", "validate_pattern", "save_pattern_draft", "render_pattern_pdf", "get_pattern_pdf", "create_tester_pack", "record_tester_feedback", "check_release_gate", "approve_release", "generate_content_package", "revise_content_asset", "prepare_video_edit", "create_etsy_draft"
+    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "select_concept", "validate_pattern", "save_pattern_draft", "render_pattern_pdf", "get_pattern_pdf", "create_tester_pack", "record_tester_feedback", "check_release_gate", "approve_release", "generate_content_package", "revise_content_asset", "prepare_video_edit", "create_etsy_draft", "publish_etsy_listing"
 ]);
 
 export class InaToolService {
@@ -115,7 +115,7 @@ export class InaToolService {
   async prepare_approval({ project_id, operation, subject }) {
     requireValue(this.approvalSecret, "approval_not_configured", "Approval callbacks are not configured.", undefined);
     const project = await this.repository.getProject(project_id);
-    requireValue(["confirm_measurements", "select_material", "select_concept", "create_tester_pack", "approve_release"].includes(operation), "invalid_approval_operation", "This action cannot be confirmed through an approval callback.");
+    requireValue(["confirm_measurements", "select_material", "select_concept", "create_tester_pack", "approve_release", "publish_etsy"].includes(operation), "invalid_approval_operation", "This action cannot be confirmed through an approval callback.");
     const subjectHash = hash(subject);
     const challenge = { id: randomUUID(), operation, subjectHash, actorId: project.ownerTelegramId, chatId: project.ownerChatId, expiresAt: new Date(Date.parse(this.now()) + 15 * 60_000).toISOString(), status: "pending", createdAt: this.now() };
     project.approvalChallenges = [...(project.approvalChallenges ?? []), challenge];
@@ -350,6 +350,20 @@ export class InaToolService {
     project.state = "etsy_draft_created";
     await this.repository.saveProject(project, "etsy_draft_created", "system");
     return { project_id, pattern_version, state: project.state, etsy_state: "draft", next_allowed_action: "Ivana reviews the Etsy draft. Publication is unavailable." };
+  }
+
+  async publish_etsy_listing({ project_id, pattern_version, listing_id, price, currency, approval_id }) {
+    const project = await this.repository.getProject(project_id);
+    const gate = releaseGate(project);
+    requireValue(gate.valid && project.state === "etsy_draft_created", "publication_gate_blocked", "A reviewed Etsy draft and valid release evidence are required before publication.", gate);
+    requireValue(project.etsyDraft?.listingId === String(listing_id), "etsy_listing_mismatch", "The requested Etsy listing is not the draft recorded for this project.");
+    consumeApproval(project, approval_id, "publish_etsy", { project_id, pattern_version, listing_id: String(listing_id), price, currency, fingerprint: project.etsyDraft.fingerprint }, this.now());
+    requireValue(this.etsyEnabled && this.etsyAdapter?.publishDraft, "etsy_not_configured", "Etsy publication is not configured.");
+    const publication = await this.etsyAdapter.publishDraft({ listingId: String(listing_id), expectedPrice: price, expectedCurrency: currency });
+    project.etsyPublication = { ...publication, patternVersion: pattern_version, publishedAt: this.now(), approvedBy: "ivana" };
+    project.state = "published";
+    await this.repository.saveProject(project, "etsy_published", "ivana");
+    return { project_id, pattern_version, state: project.state, live_url: publication.liveUrl, listing_id: publication.listingId };
   }
 }
 

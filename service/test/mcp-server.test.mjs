@@ -34,6 +34,7 @@ test("MCP server exposes exactly the approved INA tools", async () => {
       "list_projects",
       "prepare_approval",
       "prepare_video_edit",
+      "publish_etsy_listing",
       "record_tester_feedback",
       "render_pattern_pdf",
       "resume_project",
@@ -45,7 +46,6 @@ test("MCP server exposes exactly the approved INA tools", async () => {
       "select_project",
       "validate_pattern"
     ]);
-    assert.equal(names.includes("publish_etsy_listing"), false);
     assert.equal(names.includes("execute_shell"), false);
   } finally {
     await client.close();

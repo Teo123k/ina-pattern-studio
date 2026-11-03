@@ -275,7 +275,7 @@ test("holds release and Etsy draft creation until all evidence is present", asyn
 
 test("refuses tools outside the explicit allowlist", async () => {
   const service = await makeService();
-  await assert.rejects(() => service.call("publish_etsy_listing", {}), { code: "tool_not_allowed" });
+  await assert.rejects(() => service.call("publish_social_post", {}), { code: "tool_not_allowed" });
 });
 
 test("binds validations and pattern drafts to the current immutable measurement version", async () => {

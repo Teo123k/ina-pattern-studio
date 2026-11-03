@@ -25,4 +25,22 @@ export class EtsyAdapter {
     requireValue(String(listingReadback.listing_id) === String(draft.listing_id) && listingReadback.type === "download", "etsy_readback_failed", "Etsy draft readback did not match the requested digital listing.", undefined);
     return { listingId: String(draft.listing_id), state: listingReadback.state ?? "draft", type: listingReadback.type, fingerprint: createHash("sha256").update(JSON.stringify(listing)).digest("hex") };
   }
+
+  async publishDraft({ listingId, expectedPrice, expectedCurrency }) {
+    requireValue(this.apiKey && this.apiSecret && this.accessToken && this.shopId, "etsy_not_configured", "Etsy OAuth and shop configuration is incomplete.", undefined);
+    const headers = { "x-api-key": `${this.apiKey}:${this.apiSecret}`, Authorization: `Bearer ${this.accessToken}` };
+    const url = `${this.baseUrl}/v3/application/shops/${this.shopId}/listings/${listingId}`;
+    const currentResponse = await this.fetch(url, { headers });
+    if (!currentResponse.ok) throw new ToolError("etsy_readback_failed", `Etsy draft readback failed with HTTP ${currentResponse.status}.`, 502);
+    const current = await currentResponse.json();
+    requireValue(current.type === "download" && Number(current.price) === Number(expectedPrice), "etsy_publication_mismatch", "The Etsy draft no longer matches the approved digital listing.");
+    if (expectedCurrency) requireValue(!current.currency_code || current.currency_code === expectedCurrency, "etsy_publication_mismatch", "The Etsy draft currency no longer matches the approved listing.");
+    const activated = await this.fetch(url, { method: "PATCH", headers: { ...headers, "content-type": "application/x-www-form-urlencoded" }, body: new URLSearchParams({ state: "active" }) });
+    if (!activated.ok) throw new ToolError("etsy_publish_failed", `Etsy publication failed with HTTP ${activated.status}.`, 502);
+    const readback = await this.fetch(url, { headers });
+    if (!readback.ok) throw new ToolError("etsy_readback_failed", `Etsy publication readback failed with HTTP ${readback.status}.`, 502);
+    const live = await readback.json();
+    requireValue(String(live.listing_id) === String(listingId) && live.state === "active", "etsy_publish_failed", "Etsy did not confirm an active listing.");
+    return { listingId: String(listingId), state: live.state, liveUrl: live.url ?? `https://www.etsy.com/listing/${listingId}`, price: Number(live.price), currency: live.currency_code ?? expectedCurrency };
+  }
 }
