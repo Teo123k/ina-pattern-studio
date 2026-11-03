@@ -7,6 +7,8 @@ test("maps a synthetic /new photo message to the approved intake contract", asyn
     message: { message_id: 45, from: { id: 101 }, text: "/new soft shell shade", photo: [{ file_id: "small" }, { file_id: "large" }] }
   }, async (fileId) => ({ content_base64: `encoded-${fileId}` }));
   assert.deepEqual(mapped, {
+    bot_id: "ina_pattern_studio",
+    chat_id: "101",
     message_id: "45",
     sender_id: "101",
     text: "soft shell shade",

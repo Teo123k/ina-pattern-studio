@@ -7,6 +7,7 @@ export class MemoryRepository {
     this.materials = new Map();
     this.assets = new Map();
     this.events = [];
+    this.intakeTail = Promise.resolve();
   }
 
   async getProject(id) {
@@ -17,7 +18,11 @@ export class MemoryRepository {
 
   async saveProject(project, eventType, actor = "system") {
     const now = new Date().toISOString();
-    const next = structuredClone({ ...project, updatedAt: now });
+    const current = this.projects.get(project.id);
+    if (current && project.revision !== current.revision) {
+      throw new ToolError("concurrent_update", "Project changed before this update could be saved.", 409);
+    }
+    const next = structuredClone({ ...project, revision: current ? current.revision + 1 : 0, updatedAt: now });
     this.projects.set(project.id, next);
     this.events.push({ projectId: project.id, eventType, actor, createdAt: now });
     return structuredClone(next);
@@ -36,6 +41,30 @@ export class MemoryRepository {
     return structuredClone(asset);
   }
 
+  async createIntake({ project, assets, telegramEvent, actor = "system" }) {
+    const run = async () => {
+      const key = telegramEventKey(telegramEvent);
+      const existing = this.telegramEvents.get(key);
+      if (existing) {
+        if (existing.checksum !== telegramEvent.checksum) {
+          throw new ToolError("telegram_event_conflict", "Telegram event identity was reused with a different payload.", 409);
+        }
+        return { created: false, result: structuredClone(existing.result) };
+      }
+      if (this.projects.has(project.id)) throw new ToolError("project_conflict", "Project identifier already exists.", 409);
+      const now = new Date().toISOString();
+      const nextProject = structuredClone({ ...project, revision: 0, updatedAt: now });
+      this.projects.set(project.id, nextProject);
+      for (const asset of assets) this.assets.set(asset.id, structuredClone(asset));
+      this.events.push({ projectId: project.id, eventType: "project_created", actor, createdAt: now });
+      this.telegramEvents.set(key, structuredClone(telegramEvent));
+      return { created: true, result: structuredClone(telegramEvent.result) };
+    };
+    const queued = this.intakeTail.then(run, run);
+    this.intakeTail = queued.catch(() => {});
+    return queued;
+  }
+
   async listMaterials() {
     return [...this.materials.values()].map((item) => structuredClone(item));
   }
@@ -43,4 +72,8 @@ export class MemoryRepository {
   async addMaterial(material) {
     this.materials.set(material.id, structuredClone(material));
   }
+}
+
+function telegramEventKey({ botId, chatId, messageId }) {
+  return `${botId}:${chatId}:${messageId}`;
 }

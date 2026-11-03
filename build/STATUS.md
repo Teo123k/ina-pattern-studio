@@ -8,7 +8,7 @@ Allowed states: TODO, READY, IN_PROGRESS, NEEDS_REVIEW, BLOCKED_ON_INPUT, DONE. 
 |---|---|---|---|
 | [01](tickets/01.md) | Strict confirmed measurements | None | DONE |
 | [02](tickets/02.md) | Version-bound validation | 01 | DONE |
-| [03](tickets/03.md) | Atomic persistence/concurrency | 02 | READY |
+| [03](tickets/03.md) | Atomic persistence/concurrency | 02 | NEEDS_REVIEW |
 | [04](tickets/04.md) | Verified actor and approvals | 03 | TODO |
 | [05](tickets/05.md) | Telegram intake/navigation | 04 | TODO |
 | [06](tickets/06.md) | Jobs and operations | 05 | TODO |
@@ -61,3 +61,12 @@ Mock / real integration / physical evidence: Local/in-memory and MCP schema test
 Commit (if created): pending.
 Remaining gate or decision: Ticket 03 must make project/media/event records atomic under real PostgreSQL and concurrent delivery.
 Next ready ticket: 03.
+
+Ticket 03 / 2026-11-03:
+Implementation outcome: Intake now stages media and commits the Telegram event identity, project, source assets and audit record as one repository transaction. Telegram idempotency is keyed by bot/chat/message and rejects a changed payload under the same identity. Project records carry an optimistic revision so competing updates cannot both save. Added a reversible migration for this schema, an explicit integration-test command, and a disposable-PostgreSQL test covering duplicate delivery, payload conflict, rollback, concurrent measurement updates and restart persistence.
+Files changed: PostgreSQL and memory repositories, intake service, migration runner, `002_atomic_telegram_events.sql`, Telegram/MCP contracts, disposable Compose configuration, integration test and service documentation.
+Checks actually executed and results: `npm test` — 25 passed, 0 failed, 1 skipped (PostgreSQL integration intentionally has no URL); `node --check` for changed runtime/test modules — passed; `git diff --check` — clean. `docker compose up -d postgres` — blocked because the local Docker daemon was not running. `pg_isready -h 127.0.0.1 -p 54329 -d ina_pattern_studio_test` — no response. `npm run test:integration` — 1 skipped because `INA_TEST_DATABASE_URL` was not set.
+Mock / real integration / physical evidence: In-memory and MCP tests pass; no real PostgreSQL proof yet because the disposable database is unavailable.
+Commit (if created): pending.
+Remaining gate or decision: Start Docker Desktop (or provide a disposable `_test` PostgreSQL URL), then run the documented integration command. Do not mark Ticket 03 DONE until it passes.
+Next ready ticket: none; Ticket 04 depends on Ticket 03 acceptance.

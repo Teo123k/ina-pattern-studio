@@ -9,6 +9,7 @@ export const PROJECT_STATES = new Set([
 export function createProject({ projectId, ownerTelegramId, text, attachments, measurements = {}, now }) {
   return {
     id: projectId,
+    revision: 0,
     state: "brief",
     ownerTelegramId: String(ownerTelegramId),
     createdAt: now,

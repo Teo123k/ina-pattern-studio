@@ -13,6 +13,14 @@ npm test
 ALLOWED_TELEGRAM_IDS=123456789 npm start
 ```
 
+Run the disposable PostgreSQL integration suite with:
+
+```sh
+INA_TEST_DATABASE_URL=postgres://ina:development-only-change-me@127.0.0.1:54329/ina_pattern_studio_test npm run test:integration
+```
+
+It refuses database names that do not end in `_test` before truncating test tables.
+
 The current HTTP service intentionally binds to `127.0.0.1`. Put it behind an authenticated private gateway before exposing it to Hermes on another host.
 
 ## HTTP contract

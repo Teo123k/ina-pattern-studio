@@ -18,7 +18,7 @@ async function makeService() {
 
 async function createProject(service) {
   return service.call("create_project_from_telegram", {
-    message_id: "m-1", sender_id: "101", text: "My lamp", attachments: [{ kind: "photo", content_base64: "aGVsbG8=" }]
+    bot_id: "ina-test", chat_id: "chat-101", message_id: "m-1", sender_id: "101", text: "My lamp", attachments: [{ kind: "photo", content_base64: "aGVsbG8=" }]
   });
 }
 
@@ -54,7 +54,7 @@ test("creates an internal project and deduplicates Telegram delivery", async () 
 test("stores provided measurements as unconfirmed and reports missing height", async () => {
   const service = await makeService();
   const result = await service.call("create_project_from_telegram", {
-    message_id: "m-measurements",
+    bot_id: "ina-test", chat_id: "chat-101", message_id: "m-measurements",
     sender_id: "101",
     text: "Diameter 30 cm",
     measurements: { diameterCm: 30 },
@@ -84,7 +84,7 @@ test("cleans up staged object-store references when attachment storage fails", a
   };
   const service = new InaToolService({ repository, objectStore, allowedTelegramIds: ["101"] });
   await assert.rejects(() => service.call("create_project_from_telegram", {
-    message_id: "m-storage-failure",
+    bot_id: "ina-test", chat_id: "chat-101", message_id: "m-storage-failure",
     sender_id: "101",
     attachments: [{ kind: "photo", content_base64: "aA==" }, { kind: "sketch", content_base64: "eA==" }]
   }), /object storage unavailable/);
@@ -120,14 +120,14 @@ test("rejects malformed or incomplete confirmed measurements without changing pr
 
 test("rejects unsupported or non-numeric partial intake measurements", async () => {
   const service = await makeService();
-  const input = { message_id: "m-invalid-intake", sender_id: "101", attachments: [{ kind: "photo", content_base64: "aGVsbG8=" }] };
+  const input = { bot_id: "ina-test", chat_id: "chat-101", message_id: "m-invalid-intake", sender_id: "101", attachments: [{ kind: "photo", content_base64: "aGVsbG8=" }] };
   await assert.rejects(() => service.call("create_project_from_telegram", { ...input, measurements: { diameterCm: "30" } }), { code: "invalid_measurements" });
   await assert.rejects(() => service.call("create_project_from_telegram", { ...input, measurements: { unknown: 1 } }), { code: "invalid_measurements" });
 });
 
 test("rejects a non-allowlisted Telegram sender", async () => {
   const service = await makeService();
-  await assert.rejects(() => service.call("create_project_from_telegram", { message_id: "m-2", sender_id: "999", attachments: [{ kind: "photo" }] }), { code: "sender_not_allowed" });
+  await assert.rejects(() => service.call("create_project_from_telegram", { bot_id: "ina-test", chat_id: "chat-999", message_id: "m-2", sender_id: "999", attachments: [{ kind: "photo" }] }), { code: "sender_not_allowed" });
 });
 
 test("blocks construction validation until measurements are confirmed", async () => {

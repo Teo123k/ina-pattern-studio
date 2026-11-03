@@ -12,7 +12,7 @@ export const toolDefinitions = [
   {
     name: "create_project_from_telegram",
     description: "Create a brief-stage INA project from an allowlisted Telegram message after original attachments have been downloaded.",
-    schema: { message_id: z.string().min(1), sender_id: z.string().min(1), text: z.string().optional(), attachments: z.array(attachment).min(1), measurements: intakeMeasurementsSchema.optional() }
+    schema: { bot_id: z.string().min(1), chat_id: z.string().min(1), message_id: z.string().min(1), sender_id: z.string().min(1), text: z.string().optional(), attachments: z.array(attachment).min(1), measurements: intakeMeasurementsSchema.optional() }
   },
   { name: "get_project", description: "Return the compact current context for one INA project.", schema: { project_id: z.string().regex(/^INA-\d+$/) } },
   {

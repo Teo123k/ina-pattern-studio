@@ -17,6 +17,8 @@ export async function mapNewProjectUpdate(update, loadFile) {
   const loaded = await loadFile(file.file_id);
   requireValue(typeof loaded?.content_base64 === "string" && loaded.content_base64.length > 0, "attachment_download_failed", "Telegram attachment could not be downloaded.");
   return {
+    bot_id: String(update?.bot_id ?? "ina_pattern_studio"),
+    chat_id: String(message.chat?.id ?? message.from.id),
     message_id: String(message.message_id),
     sender_id: String(message.from.id),
     text: message.caption ?? message.text.replace(/^\/new\b\s*/, ""),

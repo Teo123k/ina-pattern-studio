@@ -8,7 +8,8 @@
     "dev": "node --watch service/src/server.mjs",
     "mcp": "node service/src/mcp-server.mjs",
     "test": "node --test agent/tools/validate-pattern.test.mjs tools/build-project-context.test.mjs service/test/**/*.test.mjs",
-    "migrate": "node service/src/migrate.mjs"
+    "migrate": "node service/src/migrate.mjs",
+    "test:integration": "node --test service/test/**/*.integration.test.mjs"
   },
   "engines": {
     "node": ">=22"

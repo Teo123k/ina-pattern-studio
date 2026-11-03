@@ -23,11 +23,11 @@ export class InaToolService {
 
   async create_project_from_telegram(input = {}) {
     requireValue(input && typeof input === "object" && !Array.isArray(input), "invalid_payload", "Telegram intake payload must be an object.");
-    const { message_id, sender_id, text = "", attachments = [], measurements = {} } = input;
+    const { bot_id, chat_id, message_id, sender_id, text = "", attachments = [], measurements = {} } = input;
+    requireValue(typeof bot_id === "string" && bot_id.trim(), "invalid_message", "bot_id is required.");
+    requireValue(typeof chat_id === "string" && chat_id.trim(), "invalid_message", "chat_id is required.");
     requireValue(message_id, "invalid_message", "message_id is required.");
     requireValue(this.allowedTelegramIds.has(String(sender_id)), "sender_not_allowed", "This Telegram account is not allowed to use INA.");
-    const existing = await this.repository.findTelegramEvent(message_id);
-    if (existing) return { ...existing.result, duplicate: true };
     requireValue(Array.isArray(attachments) && attachments.length > 0, "missing_attachment", "At least one source attachment is required.");
     const parsedMeasurements = parseIntakeMeasurements(measurements);
     const projectId = `INA-${Date.now()}${Math.floor(Math.random() * 1000)}`;
@@ -40,9 +40,7 @@ export class InaToolService {
         const stored = await this.objectStore.store({ projectId, messageId: message_id, kind: attachment.kind, contentBase64: attachment.content_base64 });
         storedAssets.push({ id: randomUUID(), projectId, messageId: String(message_id), kind: attachment.kind, ...stored, createdAt: now });
       }
-      for (const asset of storedAssets) await this.repository.storeAsset(asset);
       const project = createProject({ projectId, ownerTelegramId: sender_id, text, attachments: storedAssets, measurements: parsedMeasurements, now });
-      await this.repository.saveProject(project, "project_created", String(sender_id));
       const missingFields = measurementFieldNames.filter((key) => parsedMeasurements[key] === undefined);
       const result = {
         project_id: projectId,
@@ -51,12 +49,27 @@ export class InaToolService {
         missing_fields: missingFields,
         next_allowed_action: "Confirm frame dimensions, fitting, gauge and motif repeat."
       };
-      await this.repository.saveTelegramEvent(message_id, { result, senderId: String(sender_id), checksum: createHash("sha256").update(JSON.stringify({ text, attachments, measurements: parsedMeasurements })).digest("hex"), receivedAt: now });
-      return result;
-    } catch (error) {
-      if (typeof this.objectStore.remove === "function") {
-        for (const asset of storedAssets) await this.objectStore.remove(asset);
+      const intake = await this.repository.createIntake({
+        project,
+        assets: storedAssets,
+        actor: String(sender_id),
+        telegramEvent: {
+          botId: bot_id,
+          chatId: chat_id,
+          messageId: String(message_id),
+          result,
+          senderId: String(sender_id),
+          checksum: createHash("sha256").update(JSON.stringify({ text, attachments, measurements: parsedMeasurements })).digest("hex"),
+          receivedAt: now
+        }
+      });
+      if (!intake.created) {
+        await removeStagedAssets(this.objectStore, storedAssets);
+        return { ...intake.result, duplicate: true };
       }
+      return intake.result;
+    } catch (error) {
+      await removeStagedAssets(this.objectStore, storedAssets);
       throw error;
     }
   }
@@ -163,5 +176,16 @@ export class InaToolService {
     project.state = "etsy_draft_created";
     await this.repository.saveProject(project, "etsy_draft_created", "system");
     return { project_id, pattern_version, state: project.state, etsy_state: "draft", next_allowed_action: "Ivana reviews the Etsy draft. Publication is unavailable." };
+  }
+}
+
+async function removeStagedAssets(objectStore, assets) {
+  if (typeof objectStore.remove !== "function") return;
+  for (const asset of assets) {
+    try {
+      await objectStore.remove(asset);
+    } catch {
+      // A database failure remains the useful error; cleanup can be retried from object-store lifecycle rules.
+    }
   }
 }

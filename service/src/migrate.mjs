@@ -1,28 +1,39 @@
 import { readdir, readFile } from "node:fs/promises";
-import { resolve } from "node:path";
+import { fileURLToPath } from "node:url";
+import { dirname, resolve } from "node:path";
+import pg from "pg";
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) throw new Error("DATABASE_URL is required to run migrations.");
-const { default: pg } = await import("pg");
-const pool = new pg.Pool({ connectionString });
-const migrationDir = resolve("service/migrations");
-try {
-  const files = (await readdir(migrationDir)).filter((file) => file.endsWith(".sql")).sort();
-  await pool.query("CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())");
-  for (const file of files) {
-    const applied = await pool.query("SELECT 1 FROM schema_migrations WHERE version = $1", [file]);
-    if (applied.rowCount) continue;
-    await pool.query("BEGIN");
-    try {
-      await pool.query(await readFile(resolve(migrationDir, file), "utf8"));
-      await pool.query("INSERT INTO schema_migrations (version) VALUES ($1)", [file]);
-      await pool.query("COMMIT");
-      console.log(`Applied ${file}`);
-    } catch (error) {
-      await pool.query("ROLLBACK");
-      throw error;
+const defaultMigrationDir = resolve(dirname(fileURLToPath(import.meta.url)), "../migrations");
+
+export async function runMigrations({ connectionString, migrationDir = defaultMigrationDir }) {
+  const pool = new pg.Pool({ connectionString });
+  try {
+    const files = (await readdir(migrationDir)).filter((file) => file.endsWith(".sql")).sort();
+    await pool.query("CREATE TABLE IF NOT EXISTS schema_migrations (version TEXT PRIMARY KEY, applied_at TIMESTAMPTZ NOT NULL DEFAULT now())");
+    for (const file of files) {
+      const client = await pool.connect();
+      try {
+        await client.query("BEGIN");
+        const applied = await client.query("SELECT 1 FROM schema_migrations WHERE version = $1", [file]);
+        if (!applied.rowCount) {
+          await client.query(await readFile(resolve(migrationDir, file), "utf8"));
+          await client.query("INSERT INTO schema_migrations (version) VALUES ($1)", [file]);
+          console.log(`Applied ${file}`);
+        }
+        await client.query("COMMIT");
+      } catch (error) {
+        await client.query("ROLLBACK");
+        throw error;
+      } finally {
+        client.release();
+      }
     }
+  } finally {
+    await pool.end();
   }
-} finally {
-  await pool.end();
+}
+
+if (process.argv[1] === fileURLToPath(import.meta.url)) {
+  if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required to run migrations.");
+  await runMigrations({ connectionString: process.env.DATABASE_URL });
 }
