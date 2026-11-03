@@ -17,8 +17,8 @@ Allowed states: TODO, READY, IN_PROGRESS, NEEDS_REVIEW, BLOCKED_ON_INPUT, DONE. 
 | [09](tickets/09.md) | Structured pattern generation | 08 | DONE |
 | [10](tickets/10.md) | PDF and making guidance | 09 | DONE |
 | [11](tickets/11.md) | Physical tests/release | 10 | DONE |
-| [12](tickets/12.md) | Content packages | 11 | READY |
-| [13](tickets/13.md) | Video render | 12 | TODO |
+| [12](tickets/12.md) | Content packages | 11 | DONE |
+| [13](tickets/13.md) | Video render | 12 | READY |
 | [14](tickets/14.md) | Real Etsy drafts | 12 | TODO |
 | [15](tickets/15.md) | Approved Etsy publication | 14, 04 | TODO |
 | [16](tickets/16.md) | Blog publication | 12, 15 | TODO |
@@ -142,6 +142,15 @@ Mock / real integration / physical evidence: Code tests cover the new contract a
 Commit (if created): pending.
 Remaining gate or decision: Ticket 12 can prepare content drafts only from approved pattern and actual making notes.
 Next ready ticket: 12.
+
+Ticket 12 / 2026-11-03:
+Implementation outcome: Added versioned content packages generated only from an approved pattern and actual making records. Packages include a blog draft, SEO fields, listing copy with owner-supplied price, captions, three short-video concepts, carousel outline and seven-day schedule. Focused asset revisions preserve source references and keep content in draft status.
+Files changed: content tools/contracts/service and MCP tests.
+Checks actually executed and results: `npm test` — 38 passed, 0 failed, 1 skipped without a database URL; `git diff --check` — clean.
+Mock / real integration / physical evidence: Content generation is deterministic and credential-free; no publication or human content review was performed.
+Commit (if created): pending.
+Remaining gate or decision: Ticket 13 adds clip inventory and a reviewable two-minute edit decision/render path.
+Next ready ticket: 13.
 
 Ticket 10 / 2026-11-03:
 Implementation outcome: Added deterministic versioned tester PDF rendering from structured pattern data, with frame/material details, numbered rows, finishing instructions, project/version metadata and explicit not-for-sale draft language. Added artifact retrieval through the object-store adapter.

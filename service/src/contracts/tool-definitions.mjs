@@ -69,6 +69,8 @@ export const toolDefinitions = [
     description: "Record Ivana's verified approval for the exact tested pattern PDF and hash.",
     schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/), final_pdf_path: z.string().min(1), pattern_hash: z.string().length(64), approval_id: approval.shape.approval_id }
   },
+  { name: "generate_content_package", description: "Prepare reviewable blog, Etsy draft copy and social assets from an approved pattern and actual making records.", schema: { project_id: z.string().regex(/^INA-\d+$/), pattern_version: z.string().regex(/^\d+\.\d+$/), public_excerpt: z.string().max(500).optional(), owner_price: z.number().nonnegative().optional(), currency: z.string().length(3).optional() } },
+  { name: "revise_content_asset", description: "Revise one generated content asset while preserving its source version and review status.", schema: { project_id: z.string().regex(/^INA-\d+$/), content_version: z.number().int().positive(), asset: z.enum(["blog", "listing", "captions", "video_concepts", "carousel"]), instruction: z.string().min(3).max(500) } },
   {
     name: "create_etsy_draft",
     description: "Create a reviewable digital Etsy draft only after all release gates pass. It cannot publish a listing.",

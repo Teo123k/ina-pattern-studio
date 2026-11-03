@@ -7,7 +7,7 @@ import { renderPatternPdf } from "../render/pattern-pdf.mjs";
 import { validateStructuredPattern } from "../../../agent/tools/validate-structured-pattern.mjs";
 
 const allowedTools = new Set([
-    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "select_concept", "validate_pattern", "save_pattern_draft", "render_pattern_pdf", "get_pattern_pdf", "create_tester_pack", "record_tester_feedback", "check_release_gate", "approve_release", "create_etsy_draft"
+    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "select_concept", "validate_pattern", "save_pattern_draft", "render_pattern_pdf", "get_pattern_pdf", "create_tester_pack", "record_tester_feedback", "check_release_gate", "approve_release", "generate_content_package", "revise_content_asset", "create_etsy_draft"
 ]);
 
 export class InaToolService {
@@ -287,6 +287,41 @@ export class InaToolService {
     project.state = "approved";
     await this.repository.saveProject(project, "release_approved", "ivana");
     return { project_id, pattern_version, state: project.state, ...gate, approved: true };
+  }
+
+  async generate_content_package({ project_id, pattern_version, public_excerpt = "", owner_price, currency }) {
+    const project = await this.repository.getProject(project_id);
+    const pattern = project.patterns.find((item) => item.version === pattern_version);
+    requireValue(pattern && project.release.ivanaApproval, "content_gate_blocked", "Content requires the approved pattern version.");
+    requireValue(project.testing?.records?.length > 0, "content_gate_blocked", "Content requires actual making records.");
+    const sourceReferences = { patternVersion: pattern_version, patternHash: project.release.finalPatternHash, makingRecordCount: project.testing.records.length };
+    const packageVersion = (project.contentVersions?.length ?? 0) + 1;
+    const facts = { title: pattern.draft.title, frame: pattern.draft.frame, materials: pattern.draft.materials, finishing: pattern.draft.finishing, price: owner_price ?? null, currency: currency ?? null };
+    const content = {
+      version: packageVersion,
+      status: "draft",
+      sourceReferences,
+      blog: { title: `Making ${facts.title}`, seoTitle: `${facts.title} crochet lampshade pattern`, seoDescription: "A digital crochet pattern draft for a tested lampshade design.", headings: ["What you will make", "Materials and frame", "Making notes", "Download the pattern"], body: `This draft describes Ivana's ${facts.title}. The design was made and tested from the approved pattern version ${pattern_version}. Measurements and making observations are retained in the project record.`, altText: `Crochet lampshade based on ${facts.title}` },
+      listing: { title: `${facts.title} digital crochet pattern`, description: "Digital download only. No finished lampshade, lamp base, bulb, frame or materials are supplied.", tags: ["crochet pattern", "lampshade pattern", "digital download"], price: facts.price, currency: facts.currency, pdfVersion: pattern_version },
+      captions: [`A new ${facts.title} design is ready for a making preview.`, "Filming the texture, frame and finishing details.", "The tested digital pattern will be available after final review."],
+      videoConcepts: [{ title: "From frame to texture", clips: ["finished reveal", "materials", "signature stitch", "attachment", "final detail"], durationSeconds: 120 }, { title: "One repeat explained", clips: ["swatch", "repeat close-up", "finishing", "room reveal"], durationSeconds: 120 }, { title: "What I learned making it", clips: ["prototype", "correction note", "final shade"], durationSeconds: 120 }],
+      carousel: { slides: ["Finished design", "Frame and yarn", "Signature texture", "Making observation", "Digital pattern preview", "Review status"], altText: `Step-by-step preview of ${facts.title}` },
+      schedule: Array.from({ length: 7 }, (_, index) => ({ day: index + 1, asset: ["blog", "captions", "carousel", "videoConcepts", "listing", "captions", "blog"][index], status: "suggested" }))
+    };
+    project.contentVersions = [...(project.contentVersions ?? []), content];
+    await this.repository.saveProject(project, "content_package_generated", "system");
+    return { project_id, content_version: packageVersion, status: "draft", ...content };
+  }
+
+  async revise_content_asset({ project_id, content_version, asset, instruction }) {
+    const project = await this.repository.getProject(project_id);
+    const content = project.contentVersions?.find((item) => item.version === content_version);
+    requireValue(content, "content_not_found", "Content version was not found.");
+    requireValue(Object.hasOwn(content, asset), "content_not_found", "Content asset was not found.");
+    content[asset] = { ...content[asset], revisionInstruction: instruction, revisedAt: this.now() };
+    content.status = "draft";
+    await this.repository.saveProject(project, "content_asset_revised", "system");
+    return { project_id, content_version, asset, status: "draft", sourceReferences: content.sourceReferences, result: content[asset] };
   }
 
   async create_etsy_draft({ project_id, pattern_version, listing_payload }) {
