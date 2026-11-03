@@ -1,5 +1,5 @@
 import pg from "pg";
-import { ToolError } from "../domain/errors.mjs";
+import { ToolError, TransactionOutcomeUnknownError } from "../domain/errors.mjs";
 
 export class PostgresRepository {
   constructor(connectionString) {
@@ -94,16 +94,30 @@ export class PostgresRepository {
 
   async #transaction(work) {
     const client = await this.pool.connect();
+    let discardClient = false;
     try {
       await client.query("BEGIN");
-      const value = await work(client);
-      await client.query("COMMIT");
+      let value;
+      try {
+        value = await work(client);
+      } catch (error) {
+        try {
+          await client.query("ROLLBACK");
+        } catch (rollbackError) {
+          discardClient = true;
+          throw new TransactionOutcomeUnknownError("Transaction rollback could not be confirmed.", { error, rollbackError });
+        }
+        throw error;
+      }
+      try {
+        await client.query("COMMIT");
+      } catch (error) {
+        discardClient = true;
+        throw new TransactionOutcomeUnknownError("Transaction commit outcome is unknown.", error);
+      }
       return value;
-    } catch (error) {
-      await client.query("ROLLBACK");
-      throw error;
     } finally {
-      client.release();
+      client.release(discardClient);
     }
   }
 }

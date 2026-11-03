@@ -11,7 +11,8 @@ export async function mapNewProjectUpdate(update, loadFile) {
   const message = update?.message;
   requireValue(message?.message_id, "unsupported_telegram_update", "A Telegram message update is required.");
   requireValue(message?.from?.id, "unsupported_telegram_update", "Telegram sender ID is required.");
-  requireValue(message?.text?.trim().startsWith("/new"), "unsupported_telegram_update", "Only /new intake messages are handled by this mapper.");
+  const commandText = (message.caption ?? message.text ?? "").trim();
+  requireValue(/^\/new(?:\s|$)/.test(commandText), "unsupported_telegram_update", "Only /new intake messages are handled by this mapper.");
   const file = sourceFile(message);
   requireValue(file, "missing_attachment", "A /new message must include a photo, sketch, PDF or video.");
   const loaded = await loadFile(file.file_id);
@@ -21,7 +22,7 @@ export async function mapNewProjectUpdate(update, loadFile) {
     chat_id: String(message.chat?.id ?? message.from.id),
     message_id: String(message.message_id),
     sender_id: String(message.from.id),
-    text: message.caption ?? message.text.replace(/^\/new\b\s*/, ""),
+    text: commandText.replace(/^\/new(?:\s+|$)/, ""),
     attachments: [{ kind: file.kind, content_base64: loaded.content_base64 }]
   };
 }

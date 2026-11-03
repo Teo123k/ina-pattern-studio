@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { InaToolService } from "../src/app/tool-service.mjs";
 import { MemoryRepository } from "../src/adapters/memory-repository.mjs";
 import { LocalObjectStore } from "../src/adapters/local-object-store.mjs";
+import { TransactionOutcomeUnknownError } from "../src/domain/errors.mjs";
 
 async function makeService() {
   return new InaToolService({
@@ -92,6 +93,28 @@ test("cleans up staged object-store references when attachment storage fails", a
   assert.equal(repository.telegramEvents.size, 0);
   assert.equal(repository.assets.size, 0);
   assert.equal(stored.length, 0);
+});
+
+test("preserves staged media when the database commit outcome is unknown", async () => {
+  const staged = [];
+  const objectStore = {
+    async store() {
+      const asset = { storageKey: "staged-photo", checksum: "checksum" };
+      staged.push(asset);
+      return asset;
+    },
+    async remove(asset) {
+      staged.splice(staged.indexOf(asset), 1);
+    }
+  };
+  const repository = {
+    async createIntake() {
+      throw new TransactionOutcomeUnknownError("Transaction commit outcome is unknown.", new Error("connection lost"));
+    }
+  };
+  const service = new InaToolService({ repository, objectStore, allowedTelegramIds: ["101"] });
+  await assert.rejects(() => createProject(service), TransactionOutcomeUnknownError);
+  assert.equal(staged.length, 1);
 });
 
 test("rejects malformed or incomplete confirmed measurements without changing project state", async () => {

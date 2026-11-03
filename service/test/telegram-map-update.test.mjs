@@ -16,6 +16,17 @@ test("maps a synthetic /new photo message to the approved intake contract", asyn
   });
 });
 
+test("maps a captioned Telegram photo and rejects a longer command", async () => {
+  const update = { message: { message_id: 47, from: { id: 101 }, chat: { id: 202 }, caption: "/new linen shade", photo: [{ file_id: "photo" }] } };
+  const mapped = await mapNewProjectUpdate(update, async () => ({ content_base64: "YQ==" }));
+  assert.equal(mapped.chat_id, "202");
+  assert.equal(mapped.text, "linen shade");
+  await assert.rejects(
+    () => mapNewProjectUpdate({ message: { ...update.message, caption: "/newspaper shade" } }, async () => ({ content_base64: "YQ==" })),
+    { code: "unsupported_telegram_update" }
+  );
+});
+
 test("rejects an intake update without a source attachment", async () => {
   await assert.rejects(
     () => mapNewProjectUpdate({ message: { message_id: 46, from: { id: 101 }, text: "/new" } }, async () => ({ content_base64: "x" })),

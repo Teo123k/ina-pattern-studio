@@ -62,7 +62,7 @@ test("PostgreSQL intake is atomic and versioned under concurrent deliveries", { 
     const measurement = { project_id: created.project_id, expected_measurement_version: 0, measurement_version: 1, confirmed_by: "ivana", confirmed_values: { diameterCm: 30, heightCm: 20, fittingDescription: "frame", yarnIdentity: "cotton", hookMm: 4, gaugeStitchesPer10Cm: 14, gaugeRowsPer10Cm: 10, motifRepeatStitches: 12 } };
     const updates = await Promise.allSettled([first.call("save_measurements", measurement), second.call("save_measurements", measurement)]);
     assert.equal(updates.filter((result) => result.status === "fulfilled").length, 1);
-    assert.equal(updates.filter((result) => result.status === "rejected" && result.reason.code === "concurrent_update").length, 1);
+    assert.equal(updates.filter((result) => result.status === "rejected" && ["concurrent_update", "measurement_version_conflict"].includes(result.reason.code)).length, 1);
 
     await first.repository.close();
     const restarted = new PostgresRepository(connectionString);

@@ -1,5 +1,5 @@
 import { createHash, randomUUID } from "node:crypto";
-import { ToolError, requireValue } from "../domain/errors.mjs";
+import { ToolError, TransactionOutcomeUnknownError, requireValue } from "../domain/errors.mjs";
 import { assertPatternCanBeSaved, compactProject, createProject, releaseGate, validateConstruction } from "../domain/project.mjs";
 import { measurementFieldNames, parseConfirmedMeasurements, parseConstructionValidation, parseIntakeMeasurements } from "../contracts/measurement-schema.mjs";
 
@@ -69,7 +69,7 @@ export class InaToolService {
       }
       return intake.result;
     } catch (error) {
-      await removeStagedAssets(this.objectStore, storedAssets);
+      if (!(error instanceof TransactionOutcomeUnknownError)) await removeStagedAssets(this.objectStore, storedAssets);
       throw error;
     }
   }

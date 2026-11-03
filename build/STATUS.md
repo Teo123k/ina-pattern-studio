@@ -8,8 +8,8 @@ Allowed states: TODO, READY, IN_PROGRESS, NEEDS_REVIEW, BLOCKED_ON_INPUT, DONE. 
 |---|---|---|---|
 | [01](tickets/01.md) | Strict confirmed measurements | None | DONE |
 | [02](tickets/02.md) | Version-bound validation | 01 | DONE |
-| [03](tickets/03.md) | Atomic persistence/concurrency | 02 | NEEDS_REVIEW |
-| [04](tickets/04.md) | Verified actor and approvals | 03 | TODO |
+| [03](tickets/03.md) | Atomic persistence/concurrency | 02 | DONE |
+| [04](tickets/04.md) | Verified actor and approvals | 03 | READY |
 | [05](tickets/05.md) | Telegram intake/navigation | 04 | TODO |
 | [06](tickets/06.md) | Jobs and operations | 05 | TODO |
 | [07](tickets/07.md) | Materials and frame | 06 | TODO |
@@ -63,10 +63,19 @@ Remaining gate or decision: Ticket 03 must make project/media/event records atom
 Next ready ticket: 03.
 
 Ticket 03 / 2026-11-03:
-Implementation outcome: Intake now stages media and commits the Telegram event identity, project, source assets and audit record as one repository transaction. Telegram idempotency is keyed by bot/chat/message and rejects a changed payload under the same identity. Project records carry an optimistic revision so competing updates cannot both save. Added a reversible migration for this schema, an explicit integration-test command, and a disposable-PostgreSQL test covering duplicate delivery, payload conflict, rollback, concurrent measurement updates and restart persistence.
+Implementation outcome: Intake now stages media and commits the Telegram event identity, project, source assets and audit record as one repository transaction. Telegram idempotency is keyed by bot/chat/message and rejects a changed payload under the same identity. Project records carry an optimistic revision so competing updates cannot both save. Added a migration for this schema, an explicit integration-test command, and a disposable-PostgreSQL test covering duplicate delivery, payload conflict, rollback, concurrent measurement updates and restart persistence.
 Files changed: PostgreSQL and memory repositories, intake service, migration runner, `002_atomic_telegram_events.sql`, Telegram/MCP contracts, disposable Compose configuration, integration test and service documentation.
 Checks actually executed and results: `npm test` — 25 passed, 0 failed, 1 skipped (PostgreSQL integration intentionally has no URL); `node --check` for changed runtime/test modules — passed; `git diff --check` — clean. `docker compose up -d postgres` — blocked because the local Docker daemon was not running. `pg_isready -h 127.0.0.1 -p 54329 -d ina_pattern_studio_test` — no response. `npm run test:integration` — 1 skipped because `INA_TEST_DATABASE_URL` was not set.
 Mock / real integration / physical evidence: In-memory and MCP tests pass; no real PostgreSQL proof yet because the disposable database is unavailable.
 Commit (if created): pending.
-Remaining gate or decision: Start Docker Desktop (or provide a disposable `_test` PostgreSQL URL), then run the documented integration command. Do not mark Ticket 03 DONE until it passes.
-Next ready ticket: none; Ticket 04 depends on Ticket 03 acceptance.
+Remaining gate or decision: Resolved in the review follow-up below.
+Next ready ticket: 04 after integration proof.
+
+Ticket 03 review follow-up / 2026-11-03:
+Implementation outcome: A commit acknowledgement failure now produces a distinct unknown-outcome error, leaves staged media intact and discards the uncertain database connection. A confirmed rollback still propagates its original error. Captioned `/new` photos now enter intake, and longer commands such as `/newspaper` are rejected. The concurrency test accepts either valid conflict path when one request sees the other's completed measurement update.
+Files changed: PostgreSQL transaction wrapper, intake error handling, Telegram mapper, related unit/integration tests, and this ledger.
+Checks actually executed and results: `npm test` — 28 passed, 0 failed, 1 skipped without a database URL; `git diff --check` — clean. Initialized a disposable PostgreSQL 18 cluster in `/private/tmp`, created `ina_pattern_studio_test`, then ran `INA_TEST_DATABASE_URL=postgres://ina@127.0.0.1:54339/ina_pattern_studio_test npm run test:integration` — 1 passed, 0 failed, 0 skipped; migrations 001 and 002 applied there only.
+Mock / real integration / physical evidence: Unit tests cover uncertain commit handling and captioned photo intake. Live PostgreSQL integration covers duplicate delivery, changed payload rejection, rollback, competing updates and restart persistence. No live Telegram or production database was used.
+Commit (if created): pending.
+Remaining gate or decision: Ticket 04 must bind approval assertions to verified actor identity.
+Next ready ticket: 04.
