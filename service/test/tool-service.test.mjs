@@ -135,6 +135,14 @@ test("allows realistic concept review before the gauge swatch is confirmed", asy
   assert.equal(generated.concepts.length, 3);
 });
 
+test("accepts Hermes-generated concepts without a provider adapter", async () => {
+  const service = await makeService();
+  const project = await createProject(service);
+  await confirmGeometry(service, project.project_id);
+  const saved = await service.call("save_concept_options", { project_id: project.project_id, provider: "openai", model: "gpt-image-2.5-flare", concepts: [{ id: "lace-1", title: "Open lace", description: "A realistic open crochet lampshade concept.", likely_construction: "Measured open-repeat shell bands.", image_path: "private://concept/lace-1.png" }] });
+  assert.equal(saved.concepts[0].illustrationLabel, "Visual concept only — not a measured crochet pattern.");
+});
+
 test("renders and retrieves a labelled tester PDF artifact", async () => {
   const service = await makeService();
   const project = await createProject(service);

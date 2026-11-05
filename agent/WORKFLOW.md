@@ -46,6 +46,10 @@ For a drum frame:
 4. Reject the construction if no compatible count exists. The agent must ask for a new motif repeat, different gauge, adjusted frame size, or deliberately designed easing.
 5. Log the selected count and percentage difference from unrounded gauge requirement.
 
+## Hermes model-routing boundary
+
+Hermes, not INA, selects the external model for vision, image concepts and pattern drafting. Hermes submits its structured image evidence with `save_reference_evidence`, its one-to-three visual options with `save_concept_options`, and only a structured pattern draft for deterministic validation. INA does not hold model-provider credentials or trust a model to confirm measurements, geometry, safety or sale approval.
+
 The validator checks only the arithmetic and gate evidence. It cannot decide whether an ease percentage is aesthetically or structurally correct; Ivana validates that through a physical build.
 
 ## Etsy draft rule

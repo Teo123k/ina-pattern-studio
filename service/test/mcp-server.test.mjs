@@ -42,6 +42,7 @@ test("MCP server exposes exactly the approved INA tools", async () => {
       "render_pattern_pdf",
       "resume_project",
       "revise_content_asset",
+      "save_concept_options",
       "save_geometry_spec",
       "save_material_selection",
       "save_measurements",

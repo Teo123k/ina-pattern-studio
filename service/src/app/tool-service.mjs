@@ -9,7 +9,7 @@ import { validateStructuredPattern } from "../../../agent/tools/validate-structu
 import { assertDesignGeometryReady, validateGeometrySpec, validateReferenceEvidence } from "../domain/reference-geometry.mjs";
 
 const allowedTools = new Set([
-    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "save_reference_evidence", "save_geometry_spec", "record_lighting_prototype_check", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "select_concept", "validate_pattern", "save_pattern_draft", "render_pattern_pdf", "get_pattern_pdf", "create_tester_pack", "record_tester_feedback", "check_release_gate", "approve_release", "generate_content_package", "revise_content_asset", "prepare_video_edit", "create_etsy_draft", "publish_etsy_listing", "create_wordpress_draft", "publish_wordpress_post"
+    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "save_reference_evidence", "save_geometry_spec", "record_lighting_prototype_check", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "save_concept_options", "select_concept", "validate_pattern", "save_pattern_draft", "render_pattern_pdf", "get_pattern_pdf", "create_tester_pack", "record_tester_feedback", "check_release_gate", "approve_release", "generate_content_package", "revise_content_asset", "prepare_video_edit", "create_etsy_draft", "publish_etsy_listing", "create_wordpress_draft", "publish_wordpress_post"
 ]);
 
 export class InaToolService {
@@ -207,6 +207,22 @@ export class InaToolService {
     project.state = "concept_review";
     await this.repository.saveProject(project, "concepts_generated", "system");
     return { project_id, state: project.state, concept_version: project.concepts.at(-1).version, ...generated, next_allowed_action: "Ivana selects one concept for construction." };
+  }
+
+  async save_concept_options({ project_id, provider, model, concepts }) {
+    const project = await this.repository.getProject(project_id);
+    assertDesignGeometryReady(project);
+    requireValue(typeof provider === "string" && provider.trim() && typeof model === "string" && model.trim(), "invalid_concepts", "Record the external provider and model used.");
+    requireValue(Array.isArray(concepts) && concepts.length >= 1 && concepts.length <= 3, "invalid_concepts", "Provide one to three realistic concept options.");
+    const normalized = concepts.map((concept, index) => {
+      requireValue(concept && typeof concept === "object" && typeof concept.id === "string" && concept.id.trim() && typeof concept.title === "string" && concept.title.trim() && typeof concept.description === "string" && concept.description.trim() && typeof concept.likely_construction === "string" && concept.likely_construction.trim(), "invalid_concepts", `Concept ${index + 1} is incomplete.`);
+      return { id: concept.id, title: concept.title, description: concept.description, likelyConstruction: concept.likely_construction, imagePath: concept.image_path ?? null, illustrationLabel: "Visual concept only — not a measured crochet pattern." };
+    });
+    requireValue(new Set(normalized.map((concept) => concept.id)).size === normalized.length, "invalid_concepts", "Concept IDs must be unique.");
+    project.concepts = [...(project.concepts ?? []), { version: (project.concepts?.length ?? 0) + 1, provenance: { external: true }, skillLevel: "external", visualDirection: "Hermes-generated realistic concepts", generated: { provider, model, generatedAt: this.now(), estimatedCostPence: null, concepts: normalized }, createdAt: this.now() }];
+    project.state = "concept_review";
+    await this.repository.saveProject(project, "external_concepts_saved", "hermes");
+    return { project_id, state: project.state, concept_version: project.concepts.at(-1).version, concepts: normalized, next_allowed_action: "Ivana selects one realistic concept before gauge and pattern work." };
   }
 
   async select_concept({ project_id, concept_id, approval_id }) {

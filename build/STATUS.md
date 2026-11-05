@@ -222,5 +222,5 @@ Files changed: reference/geometry domain module/tests, project/release gates, to
 Checks actually executed and results: `npm test` — 53 passed, 0 failed, 1 skipped without a database URL; `git diff --check` — clean.
 Mock / real integration / physical evidence: Deterministic unit/service tests only. No reference image vision analysis, actual ring/bulb measurement, supervised temperature/airflow check or physical prototype was performed.
 Commit (if created): pending.
-Remaining gate or decision: Configure the selected vision/pattern provider in Hermes and run Product 0 with a real image plus actual 5.5-inch ring/fitting/bulb evidence. Human approval and physical test evidence remain mandatory.
+Remaining gate or decision: Hermes now supplies provider output through restricted evidence/concept tools; configure its selected vision/pattern models and run Product 0 with a real image plus actual 5.5-inch ring/fitting/bulb evidence. Human approval and physical test evidence remain mandatory.
 Next ready ticket: Ticket 17 remains IN_PROGRESS; Ticket 19 needs live Product 0 evidence before it can be DONE.
