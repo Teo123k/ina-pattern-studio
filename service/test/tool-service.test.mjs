@@ -127,6 +127,14 @@ test("generates constrained concept illustrations and requires verified selectio
   assert.equal(selected.selectedConcept.conceptId, "concept-1");
 });
 
+test("allows realistic concept review before the gauge swatch is confirmed", async () => {
+  const service = await makeService();
+  const project = await createProject(service);
+  await confirmGeometry(service, project.project_id);
+  const generated = await service.call("generate_concepts", { project_id: project.project_id, provenance: { is_original: true, notes: "Ivana's original reference-led lampshade direction." }, skill_level: "confident_beginner", visual_direction: "Light open crochet texture around the measured drum frame.", avoid: [] });
+  assert.equal(generated.concepts.length, 3);
+});
+
 test("renders and retrieves a labelled tester PDF artifact", async () => {
   const service = await makeService();
   const project = await createProject(service);

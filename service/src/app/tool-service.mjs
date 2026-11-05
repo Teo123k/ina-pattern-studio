@@ -202,9 +202,7 @@ export class InaToolService {
   async generate_concepts({ project_id, provenance, skill_level, visual_direction, avoid = [] }) {
     const project = await this.repository.getProject(project_id);
     assertDesignGeometryReady(project);
-    requireValue(project.measurements?.confirmed, "needs_measurement", "Confirm measurements before generating concepts.");
-    requireValue(project.material?.snapshot, "needs_material", "Select a source-backed material before generating concepts.");
-    const generated = await this.conceptAdapter.generate({ brief: { projectId: project_id, provenance, skillLevel: skill_level, visualDirection: visual_direction, avoid, frame: project.measurements.values, material: project.material.snapshot } });
+    const generated = await this.conceptAdapter.generate({ brief: { projectId: project_id, provenance, skillLevel: skill_level, visualDirection: visual_direction, avoid, frame: project.geometry, material: project.material?.snapshot ?? null } });
     project.concepts = [...(project.concepts ?? []), { version: (project.concepts?.length ?? 0) + 1, provenance, skillLevel: skill_level, visualDirection: visual_direction, generated, createdAt: this.now() }];
     project.state = "concept_review";
     await this.repository.saveProject(project, "concepts_generated", "system");

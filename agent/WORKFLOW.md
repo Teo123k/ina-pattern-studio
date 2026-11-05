@@ -19,7 +19,7 @@
 |---|---|---|---|
 | `brief` | Source image and evidence report | `reference_review` | Agent |
 | `reference_review` | Actual ring, fitting and bulb geometry confirmed | `concept_review` | Ivana |
-| `concept_review` | Ivana selected concept ID | `construction` | Ivana |
+| `concept_review` | Ivana selected realistic concept ID | `construction` | Ivana |
 | `construction` | Frame, gauge, yarn and motif repeat known | `pattern_draft` | Agent after validator pass |
 | `pattern_draft` | Prototype build logged | `prototype` | Ivana |
 | `prototype` | Ivana reproduced the design | `tester_review` | Ivana |
