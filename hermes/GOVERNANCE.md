@@ -12,6 +12,7 @@ Hermes may create internal records and reviewable drafts. It may not publish, se
 |---|---|
 | Select concept | Ivana confirms project concept ID |
 | Select materials | Ivana confirms selected material option |
+| Confirm ring/bulb geometry | Ivana confirms the exact measured geometry and manufacturer-instruction acknowledgement |
 | Start tester pack | Ivana confirms pattern-draft version |
 | Release candidate | Two prototypes, three independent testers, zero critical issues |
 | Blog/tutorial final | Ivana approves exact content version |
@@ -24,4 +25,5 @@ Hermes may create internal records and reviewable drafts. It may not publish, se
 - Object storage is the source of truth for original media and versioned artifacts.
 - Supplier details are only confirmed when a recorded source and date are present.
 - A pattern is only released when its project record contains actual test evidence.
+- Lighting targets are prototype guidance, never a safety or certification claim. Do not release without the supervised recorded LED temperature and airflow check.
 - Hermes session history and native memory are temporary context, never evidence.

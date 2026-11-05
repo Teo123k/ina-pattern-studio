@@ -6,9 +6,10 @@ import { MockConceptAdapter } from "../adapters/concept-adapter.mjs";
 import { renderPatternPdf } from "../render/pattern-pdf.mjs";
 import { validateEditDecision } from "../video/edit-decision.mjs";
 import { validateStructuredPattern } from "../../../agent/tools/validate-structured-pattern.mjs";
+import { assertDesignGeometryReady, validateGeometrySpec, validateReferenceEvidence } from "../domain/reference-geometry.mjs";
 
 const allowedTools = new Set([
-    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "select_concept", "validate_pattern", "save_pattern_draft", "render_pattern_pdf", "get_pattern_pdf", "create_tester_pack", "record_tester_feedback", "check_release_gate", "approve_release", "generate_content_package", "revise_content_asset", "prepare_video_edit", "create_etsy_draft", "publish_etsy_listing", "create_wordpress_draft", "publish_wordpress_post"
+    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "save_reference_evidence", "save_geometry_spec", "record_lighting_prototype_check", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "select_concept", "validate_pattern", "save_pattern_draft", "render_pattern_pdf", "get_pattern_pdf", "create_tester_pack", "record_tester_feedback", "check_release_gate", "approve_release", "generate_content_package", "revise_content_asset", "prepare_video_edit", "create_etsy_draft", "publish_etsy_listing", "create_wordpress_draft", "publish_wordpress_post"
 ]);
 
 export class InaToolService {
@@ -117,7 +118,7 @@ export class InaToolService {
   async prepare_approval({ project_id, operation, subject }) {
     requireValue(this.approvalSecret, "approval_not_configured", "Approval callbacks are not configured.", undefined);
     const project = await this.repository.getProject(project_id);
-    requireValue(["confirm_measurements", "select_material", "select_concept", "create_tester_pack", "approve_release", "publish_etsy", "publish_wordpress"].includes(operation), "invalid_approval_operation", "This action cannot be confirmed through an approval callback.");
+    requireValue(["confirm_measurements", "confirm_geometry", "select_material", "select_concept", "create_tester_pack", "approve_release", "publish_etsy", "publish_wordpress"].includes(operation), "invalid_approval_operation", "This action cannot be confirmed through an approval callback.");
     const subjectHash = hash(subject);
     const challenge = { id: randomUUID(), operation, subjectHash, actorId: project.ownerTelegramId, chatId: project.ownerChatId, expiresAt: new Date(Date.parse(this.now()) + 15 * 60_000).toISOString(), status: "pending", createdAt: this.now() };
     project.approvalChallenges = [...(project.approvalChallenges ?? []), challenge];
@@ -157,6 +158,35 @@ export class InaToolService {
     return compactProject(project);
   }
 
+  async save_reference_evidence({ project_id, evidence }) {
+    const project = await this.repository.getProject(project_id);
+    const saved = validateReferenceEvidence(evidence);
+    project.referenceEvidence = { ...saved, createdAt: this.now(), sourceAssetIds: project.source.attachments.map((asset) => asset.id) };
+    project.geometry = null;
+    project.state = saved.classification === "redesign_required" ? "brief" : "reference_review";
+    await this.repository.saveProject(project, "reference_evidence_saved", "system");
+    return { project_id, classification: saved.classification, next_allowed_action: saved.classification === "redesign_required" ? "Present a buildable redesign that preserves visual character without claiming an exact copy." : "Confirm actual ring, fitting and bulb geometry." };
+  }
+
+  async save_geometry_spec({ project_id, geometry, approval_id }) {
+    const project = await this.repository.getProject(project_id);
+    requireValue(project.referenceEvidence?.classification !== "redesign_required", "redesign_required", "Approve a buildable redesign before saving geometry.");
+    const confirmed = validateGeometrySpec(geometry);
+    consumeApproval(project, approval_id, "confirm_geometry", { project_id, geometry }, this.now());
+    project.geometry = { version: (project.geometry?.version ?? 0) + 1, status: "CONFIRMED", ...confirmed, confirmedAt: this.now(), confirmedBy: "ivana" };
+    project.state = "construction";
+    await this.repository.saveProject(project, "geometry_confirmed", "ivana");
+    return { project_id, geometry: project.geometry, next_allowed_action: "Select a source-backed material, then generate a realistic concept." };
+  }
+
+  async record_lighting_prototype_check({ project_id, check }) {
+    const project = await this.repository.getProject(project_id);
+    requireValue(check?.supervised === true && check?.manufacturerInstructionsFollowed === true && typeof check?.temperatureObservation === "string" && check.temperatureObservation.trim() && typeof check?.airflowObserved === "string" && check.airflowObserved.trim(), "invalid_lighting_check", "Record supervised LED temperature observation, airflow observation and manufacturer-instruction acknowledgement.");
+    project.testing = { ...(project.testing ?? {}), lightingPrototypeCheck: { supervised: true, manufacturerInstructionsFollowed: true, temperatureObservation: check.temperatureObservation, airflowObserved: check.airflowObserved, recordedAt: this.now() } };
+    await this.repository.saveProject(project, "lighting_prototype_check_recorded", "ivana");
+    return compactProject(project);
+  }
+
   async find_material_options({ project_id }) {
     const project = await this.repository.getProject(project_id);
     const options = (await this.repository.listMaterials()).slice(0, 3);
@@ -171,6 +201,7 @@ export class InaToolService {
 
   async generate_concepts({ project_id, provenance, skill_level, visual_direction, avoid = [] }) {
     const project = await this.repository.getProject(project_id);
+    assertDesignGeometryReady(project);
     requireValue(project.measurements?.confirmed, "needs_measurement", "Confirm measurements before generating concepts.");
     requireValue(project.material?.snapshot, "needs_material", "Select a source-backed material before generating concepts.");
     const generated = await this.conceptAdapter.generate({ brief: { projectId: project_id, provenance, skillLevel: skill_level, visualDirection: visual_direction, avoid, frame: project.measurements.values, material: project.material.snapshot } });
@@ -222,7 +253,7 @@ export class InaToolService {
   async save_pattern_draft({ project_id, pattern_version, validation_id, draft }) {
     const project = await this.repository.getProject(project_id);
     assertPatternCanBeSaved(project, pattern_version, validation_id);
-    const validatedDraft = validateStructuredPattern(draft);
+    const validatedDraft = validateStructuredPattern({ ...draft, lighting: assertDesignGeometryReady(project).lighting, geometry: assertDesignGeometryReady(project).calculated });
     project.patterns.push({ version: pattern_version, status: "not_for_sale", validationId: validation_id, measurementVersion: project.measurements.version, draft: validatedDraft, createdAt: this.now() });
     project.state = "pattern_draft";
     await this.repository.saveProject(project, "pattern_draft_saved", "system");

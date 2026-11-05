@@ -1,9 +1,10 @@
 import { validatePatternConstruction, validateReleaseGate } from "../../../agent/tools/validate-pattern.mjs";
 import { ToolError, requireValue } from "./errors.mjs";
 import { measurementFieldNames } from "../contracts/measurement-schema.mjs";
+import { assertDesignGeometryReady, lightingTestGate } from "./reference-geometry.mjs";
 
 export const PROJECT_STATES = new Set([
-  "brief", "construction", "pattern_draft", "prototype", "tester_review", "release_candidate", "approved", "etsy_draft_created"
+  "brief", "reference_review", "construction", "pattern_draft", "prototype", "tester_review", "release_candidate", "approved", "etsy_draft_created", "published"
 ]);
 
 export function createProject({ projectId, ownerTelegramId, ownerChatId, text, attachments, measurements = {}, now }) {
@@ -16,6 +17,8 @@ export function createProject({ projectId, ownerTelegramId, ownerChatId, text, a
     createdAt: now,
     updatedAt: now,
     source: { text: text ?? "", attachments },
+    referenceEvidence: null,
+    geometry: null,
     measurements: { version: 0, status: "UNCONFIRMED", confirmed: false, values: structuredClone(measurements), history: [] },
     material: null,
     concepts: [],
@@ -67,6 +70,7 @@ export function assertPatternCanBeSaved(project, version, validationId) {
   requireValue(validationId === project.latestValidation.id, "validation_required", "Pattern draft must name the current successful validation ID.");
   requireValue(typeof version === "string" && /^\d+\.\d+$/.test(version), "invalid_pattern_version", "Pattern version must use major.minor form, for example 1.0.");
   requireValue(!project.patterns.some((pattern) => pattern.version === version), "duplicate_pattern_version", "Pattern version already exists.");
+  assertDesignGeometryReady(project);
 }
 
 export function releaseGate(project) {
@@ -74,7 +78,7 @@ export function releaseGate(project) {
   const prototypeCount = records.filter((record) => record.kind === "prototype" && record.completed).length || project.testing.prototypeCount;
   const testerCount = new Set(records.filter((record) => record.kind === "tester" && record.completed).map((record) => record.makerId)).size || project.testing.testerCount;
   const criticalIssuesOpen = records.flatMap((record) => record.issues ?? []).filter((issue) => issue.severity === "critical" && issue.resolved !== true).length;
-  return validateReleaseGate({
+  const result = validateReleaseGate({
     ivanaApproval: project.release.ivanaApproval,
     prototypeCount,
     testerCount,
@@ -82,6 +86,8 @@ export function releaseGate(project) {
     finalPdfPath: project.release.finalPdfPath,
     etsyDraftReviewed: project.release.etsyDraftReviewed
   });
+  const lightingError = lightingTestGate(project);
+  return lightingError ? { valid: false, errors: [...result.errors, lightingError] } : result;
 }
 
 export function compactProject(project) {
@@ -89,6 +95,8 @@ export function compactProject(project) {
     projectId: project.id,
     state: project.state,
     measurements: project.measurements,
+    referenceEvidence: project.referenceEvidence,
+    geometry: project.geometry,
     material: project.material,
     concepts: project.concepts ?? [],
     selectedConcept: project.selectedConcept ?? null,
@@ -106,6 +114,9 @@ export function summarizeTesting(project) {
 }
 
 export function nextAllowedAction(project) {
+  if (!project.referenceEvidence) return "Create an image evidence and confidence report from the reference.";
+  if (project.referenceEvidence.classification === "redesign_required") return "Approve a realistic buildable redesign concept.";
+  if (project.geometry?.status !== "CONFIRMED") return "Confirm actual ring, fitting and bulb geometry.";
   if (!project.measurements.confirmed) return "Confirm frame dimensions, fitting, gauge and motif repeat.";
   if (!project.latestValidation?.valid) return "Validate the selected construction.";
   if (!project.patterns.length) return "Save a not-for-sale pattern draft.";

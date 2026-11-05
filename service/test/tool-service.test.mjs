@@ -47,6 +47,15 @@ async function confirmMeasurements(service, projectId, { expectedVersion = 0, me
   });
 }
 
+async function confirmGeometry(service, projectId) {
+  const evidence = { classification: "inferred_draft_only", observations: ["clear_photo", "known_ring_size", "partially_visible_stitch_pattern"], limitations: ["Back attachment is not visible."] };
+  const geometry = { frame: { topRingInnerDiameterCm: 14, bottomRingInnerDiameterCm: 20, shadeHeightCm: 18, fittingDescription: "centred E27 frame" }, bulb: { identity: "LED globe", maxDiameterCm: 6, radialOffsetCm: 0, topRelativeToTopRingCm: 2 }, manufacturerInstructionsAcknowledged: true };
+  await service.call("save_reference_evidence", { project_id: projectId, evidence });
+  const approval = await service.call("prepare_approval", { project_id: projectId, operation: "confirm_geometry", subject: { project_id: projectId, geometry } });
+  await service.approve_gateway_callback({ project_id: projectId, callback_data: approval.callback_data, actor_id: "101", chat_id: "chat-101" });
+  return service.call("save_geometry_spec", { project_id: projectId, geometry, approval_id: approval.approval_id });
+}
+
 function validPatternDraft() {
   return { title: "First lampshade", frame: { diameterCm: 30, heightCm: 20, fittingDescription: "standard drum frame" }, materials: { yarn: "cotton DK", hookMm: 4, gauge: "14 stitches x 10 rows" }, repeat: { stitches: 12, count: 10 }, rows: [{ number: 1, instruction: "Ch 2, work 12 dc around.", stitchCount: 12, operations: ["ch", "dc"] }], finishing: "Fasten off and weave in ends." };
 }
@@ -104,6 +113,7 @@ test("generates constrained concept illustrations and requires verified selectio
   const service = await makeService();
   const project = await createProject(service);
   await confirmMeasurements(service, project.project_id);
+  await confirmGeometry(service, project.project_id);
   await service.call("add_material_option", { id: "cotton-dk", supplier: "Example Mill", product: "Cotton DK", source_url: "https://example.com/cotton-dk", checked_at: "2026-11-03", fibre: "100% cotton", grams_per_ball: 100, metres_per_ball: 240, hook_guidance: "3.5-4 mm", cost: 8, currency: "GBP", availability: "recorded" });
   const materialApproval = await service.call("prepare_approval", { project_id: project.project_id, operation: "select_material", subject: { project_id: project.project_id, material_option_id: "cotton-dk" } });
   await service.approve_gateway_callback({ project_id: project.project_id, callback_data: materialApproval.callback_data, actor_id: "101", chat_id: "chat-101" });
@@ -121,6 +131,7 @@ test("renders and retrieves a labelled tester PDF artifact", async () => {
   const service = await makeService();
   const project = await createProject(service);
   await confirmMeasurements(service, project.project_id);
+  await confirmGeometry(service, project.project_id);
   const validation = await service.call("validate_pattern", { project_id: project.project_id, construction_spec: { measurementVersion: 1, fitTolerancePercent: 3 } });
   await service.call("save_pattern_draft", { project_id: project.project_id, pattern_version: "1.0", validation_id: validation.validation_id, draft: validPatternDraft() });
   const rendered = await service.call("render_pattern_pdf", { project_id: project.project_id, pattern_version: "1.0" });
@@ -249,10 +260,22 @@ test("blocks construction validation until measurements are confirmed", async ()
   await assert.rejects(() => service.call("validate_pattern", { project_id: project.project_id, construction_spec: { measurementVersion: 0, fitTolerancePercent: 3 } }), { code: "needs_measurement" });
 });
 
+test("blocks a pattern draft until reference evidence and actual bulb geometry are confirmed", async () => {
+  const service = await makeService();
+  const project = await createProject(service);
+  await confirmMeasurements(service, project.project_id);
+  const validation = await service.call("validate_pattern", { project_id: project.project_id, construction_spec: { measurementVersion: 1, fitTolerancePercent: 3 } });
+  await assert.rejects(() => service.call("save_pattern_draft", { project_id: project.project_id, pattern_version: "1.0", validation_id: validation.validation_id, draft: validPatternDraft() }), { code: "reference_evidence_required" });
+  await confirmGeometry(service, project.project_id);
+  const saved = await service.call("save_pattern_draft", { project_id: project.project_id, pattern_version: "1.0", validation_id: validation.validation_id, draft: validPatternDraft() });
+  assert.equal(saved.currentPattern.draft.lighting.status, "prototype_target_not_safety_certification");
+});
+
 test("rejects an incompatible stitch repeat and permits a valid pattern draft", async () => {
   const service = await makeService();
   const project = await createProject(service);
   await confirmMeasurements(service, project.project_id, { values: { motifRepeatStitches: 37 } });
+  await confirmGeometry(service, project.project_id);
   const failed = await service.call("validate_pattern", { project_id: project.project_id, construction_spec: { measurementVersion: 1, fitTolerancePercent: 0.1 } });
   assert.equal(failed.valid, false);
   await confirmMeasurements(service, project.project_id, { expectedVersion: 1, measurementVersion: 2, values: { motifRepeatStitches: 12 } });
@@ -266,6 +289,7 @@ test("holds release and Etsy draft creation until all evidence is present", asyn
   const service = await makeService();
   const project = await createProject(service);
   await confirmMeasurements(service, project.project_id);
+  await confirmGeometry(service, project.project_id);
   const validation = await service.call("validate_pattern", { project_id: project.project_id, construction_spec: { measurementVersion: 1, fitTolerancePercent: 3 } });
   await service.call("save_pattern_draft", { project_id: project.project_id, pattern_version: "1.0", validation_id: validation.validation_id, draft: validPatternDraft() });
   const blocked = await service.call("check_release_gate", { project_id: project.project_id, pattern_version: "1.0" });
@@ -282,6 +306,7 @@ test("binds validations and pattern drafts to the current immutable measurement 
   const service = await makeService();
   const project = await createProject(service);
   await confirmMeasurements(service, project.project_id);
+  await confirmGeometry(service, project.project_id);
   const versionOneValidation = await service.call("validate_pattern", { project_id: project.project_id, construction_spec: { measurementVersion: 1, fitTolerancePercent: 3 } });
   await assert.rejects(
     () => service.call("validate_pattern", { project_id: project.project_id, construction_spec: { measurementVersion: 1, fitTolerancePercent: 3, motifRepeatStitches: 6 } }),

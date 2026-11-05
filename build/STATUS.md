@@ -24,6 +24,7 @@ Allowed states: TODO, READY, IN_PROGRESS, NEEDS_REVIEW, BLOCKED_ON_INPUT, DONE. 
 | [16](tickets/16.md) | Blog publication | 12, 15 | BLOCKED_ON_INPUT |
 | [17](tickets/17.md) | Usage limits/recovery | 06, 12 | IN_PROGRESS |
 | [18](tickets/18.md) | Complete Ivana pilot | 01–17 | BLOCKED_ON_INPUT |
+| [19](tickets/19.md) | Reference evidence and lighting geometry gate | 01–11 | NEEDS_REVIEW |
 
 ## Evidence entry template
 
@@ -214,3 +215,12 @@ Mock / real integration / physical evidence: Unit tests use a mock Telegram API.
 Commit (if created): pending.
 Remaining gate or decision: Deployment must set `TELEGRAM_BOT_TOKEN`, `TELEGRAM_WEBHOOK_SECRET`, allowlisted Telegram IDs, service API secret, PostgreSQL and S3 storage, then register the HTTPS webhook. The button-led maker flow and model provider are separate next work.
 Next ready ticket: Ticket 17 remains IN_PROGRESS.
+
+Ticket 19 / 2026-11-05:
+Implementation outcome: Replaced generic image-to-pattern progression with an evidence-and-geometry gate. References are recorded as high-confidence conversion, inferred draft only or redesign required; high-confidence assertions require the named observed evidence. Pattern drafts and concepts now require Ivana-confirmed measured ring, fitting and bulb geometry. The service calculates available side/top clearance from actual geometry, stores prototype-only LED/airflow/weight targets, and blocks sale approval until a supervised temperature and airflow observation is recorded. No certification or generic clearance promise is produced.
+Files changed: reference/geometry domain module/tests, project/release gates, tool service/contracts/MCP registry, workflow/governance documents, test fixtures and ticket ledger.
+Checks actually executed and results: `npm test` — 53 passed, 0 failed, 1 skipped without a database URL; `git diff --check` — clean.
+Mock / real integration / physical evidence: Deterministic unit/service tests only. No reference image vision analysis, actual ring/bulb measurement, supervised temperature/airflow check or physical prototype was performed.
+Commit (if created): pending.
+Remaining gate or decision: Configure the selected vision/pattern provider in Hermes and run Product 0 with a real image plus actual 5.5-inch ring/fitting/bulb evidence. Human approval and physical test evidence remain mandatory.
+Next ready ticket: Ticket 17 remains IN_PROGRESS; Ticket 19 needs live Product 0 evidence before it can be DONE.
