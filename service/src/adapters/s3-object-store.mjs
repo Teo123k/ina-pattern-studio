@@ -1,4 +1,4 @@
-import { DeleteObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
+import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from "@aws-sdk/client-s3";
 import { createHash, randomUUID } from "node:crypto";
 
 export class S3ObjectStore {
@@ -13,7 +13,7 @@ export class S3ObjectStore {
   }
 
   async store({ projectId, messageId, kind, contentBase64 = "" }) {
-    const safeKind = ["photo", "sketch", "pdf", "video"].includes(kind) ? kind : "file";
+    const safeKind = ["photo", "sketch", "pdf", "video", "glb", "json"].includes(kind) ? kind : "file";
     const key = `${projectId}/${messageId}/${randomUUID()}.${safeKind}`;
     const body = Buffer.from(contentBase64, "base64");
     const checksum = createHash("sha256").update(body).digest("hex");
@@ -23,5 +23,10 @@ export class S3ObjectStore {
 
   async remove({ storageKey }) {
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: storageKey }));
+  }
+
+  async read(storageKey) {
+    const response = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: storageKey }));
+    return Buffer.from(await response.Body.transformToByteArray());
   }
 }

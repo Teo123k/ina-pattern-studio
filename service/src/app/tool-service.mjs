@@ -7,9 +7,10 @@ import { renderPatternPdf } from "../render/pattern-pdf.mjs";
 import { validateEditDecision } from "../video/edit-decision.mjs";
 import { validateStructuredPattern } from "../../../agent/tools/validate-structured-pattern.mjs";
 import { assertDesignGeometryReady, validateGeometrySpec, validateReferenceEvidence } from "../domain/reference-geometry.mjs";
+import { buildGeometryPreview } from "../geometry/preview.mjs";
 
 const allowedTools = new Set([
-    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "save_reference_evidence", "save_geometry_spec", "record_lighting_prototype_check", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "save_concept_options", "select_concept", "validate_pattern", "save_pattern_draft", "render_pattern_pdf", "get_pattern_pdf", "create_tester_pack", "record_tester_feedback", "check_release_gate", "approve_release", "generate_content_package", "revise_content_asset", "prepare_video_edit", "create_etsy_draft", "publish_etsy_listing", "create_wordpress_draft", "publish_wordpress_post"
+    "create_project_from_telegram", "get_project", "list_projects", "select_project", "resume_project", "enqueue_job", "get_job", "cancel_job", "prepare_approval", "save_measurements", "save_reference_evidence", "save_geometry_spec", "build_geometry_preview", "get_geometry_preview", "record_lighting_prototype_check", "find_material_options", "add_material_option", "save_material_selection", "generate_concepts", "save_concept_options", "select_concept", "validate_pattern", "save_pattern_draft", "render_pattern_pdf", "get_pattern_pdf", "create_tester_pack", "record_tester_feedback", "check_release_gate", "approve_release", "generate_content_package", "revise_content_asset", "prepare_video_edit", "create_etsy_draft", "publish_etsy_listing", "create_wordpress_draft", "publish_wordpress_post"
 ]);
 
 export class InaToolService {
@@ -185,6 +186,26 @@ export class InaToolService {
     project.testing = { ...(project.testing ?? {}), lightingPrototypeCheck: { supervised: true, manufacturerInstructionsFollowed: true, temperatureObservation: check.temperatureObservation, airflowObserved: check.airflowObserved, recordedAt: this.now() } };
     await this.repository.saveProject(project, "lighting_prototype_check_recorded", "ivana");
     return compactProject(project);
+  }
+
+  async build_geometry_preview({ project_id, geometry_version, stitch_surface }) {
+    const project = await this.repository.getProject(project_id);
+    const geometry = assertDesignGeometryReady(project);
+    const preview = buildGeometryPreview({ geometry, geometryVersion: geometry_version, surface: stitch_surface });
+    const reportAsset = await this.objectStore.store({ projectId: project_id, messageId: `geometry-${geometry_version}`, kind: "json", contentBase64: Buffer.from(JSON.stringify(preview.report, null, 2)).toString("base64") });
+    const glbAsset = await this.objectStore.store({ projectId: project_id, messageId: `geometry-${geometry_version}`, kind: "glb", contentBase64: preview.glb.toString("base64") });
+    const record = { id: randomUUID(), geometryVersion: geometry_version, reportPath: reportAsset.storageKey, reportChecksum: reportAsset.checksum, glbPath: glbAsset.storageKey, glbChecksum: glbAsset.checksum, status: preview.report.status, createdAt: this.now() };
+    project.geometryPreviews = [...(project.geometryPreviews ?? []), record];
+    await this.repository.saveProject(project, "geometry_preview_built", "system");
+    return { project_id, preview_id: record.id, status: record.status, report: preview.report, glb_path: record.glbPath, next_allowed_action: "Review this digital prediction; it is not a physical or safety verification." };
+  }
+
+  async get_geometry_preview({ project_id, preview_id }) {
+    const project = await this.repository.getProject(project_id);
+    const preview = project.geometryPreviews?.find((item) => item.id === preview_id);
+    requireValue(preview, "geometry_preview_not_found", "Geometry preview was not found.");
+    requireValue(typeof this.objectStore.read === "function", "artifact_retrieval_unavailable", "Artifact retrieval is not configured.");
+    return { project_id, preview_id, status: preview.status, report_content_base64: (await this.objectStore.read(preview.reportPath)).toString("base64"), glb_content_base64: (await this.objectStore.read(preview.glbPath)).toString("base64"), glb_checksum: preview.glbChecksum };
   }
 
   async find_material_options({ project_id }) {

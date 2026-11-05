@@ -28,7 +28,7 @@ export function validateGeometrySpec(spec) {
   requireValue(spec && typeof spec === "object", "invalid_geometry", "Measured frame and bulb geometry is required.");
   const frame = spec.frame ?? {};
   const bulb = spec.bulb ?? {};
-  for (const [name, value] of Object.entries({ topRingInnerDiameterCm: frame.topRingInnerDiameterCm, bottomRingInnerDiameterCm: frame.bottomRingInnerDiameterCm, shadeHeightCm: frame.shadeHeightCm, bulbMaxDiameterCm: bulb.maxDiameterCm })) requireValue(Number.isFinite(value) && value > 0, "invalid_geometry", `${name} must be a positive measured number.`);
+  for (const [name, value] of Object.entries({ topRingInnerDiameterCm: frame.topRingInnerDiameterCm, bottomRingInnerDiameterCm: frame.bottomRingInnerDiameterCm, shadeHeightCm: frame.shadeHeightCm, bulbMaxDiameterCm: bulb.maxDiameterCm, bulbHeightCm: bulb.heightCm })) requireValue(Number.isFinite(value) && value > 0, "invalid_geometry", `${name} must be a positive measured number.`);
   requireValue(Number.isFinite(bulb.radialOffsetCm) && bulb.radialOffsetCm >= 0, "invalid_geometry", "bulb.radialOffsetCm must be a measured non-negative number.");
   requireValue(Number.isFinite(bulb.topRelativeToTopRingCm), "invalid_geometry", "bulb.topRelativeToTopRingCm must be measured from the actual fitting and bulb position.");
   requireValue(frame.fittingDescription?.trim() && bulb.identity?.trim(), "invalid_geometry", "Actual fitting and bulb identity are required.");

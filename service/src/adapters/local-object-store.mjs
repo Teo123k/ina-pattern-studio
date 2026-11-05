@@ -8,7 +8,7 @@ export class LocalObjectStore {
   }
 
   async store({ projectId, messageId, kind, contentBase64 = "" }) {
-    const safeKind = ["photo", "sketch", "pdf", "video"].includes(kind) ? kind : "file";
+    const safeKind = ["photo", "sketch", "pdf", "video", "glb", "json"].includes(kind) ? kind : "file";
     const key = `${projectId}/${messageId}/${randomUUID()}.${safeKind}`;
     const absolutePath = resolve(this.rootDirectory, key);
     if (!absolutePath.startsWith(`${this.rootDirectory}/`)) throw new Error("Invalid object-storage key.");

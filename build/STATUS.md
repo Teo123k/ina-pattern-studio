@@ -224,3 +224,12 @@ Mock / real integration / physical evidence: Deterministic unit/service tests on
 Commit (if created): pending.
 Remaining gate or decision: Hermes now supplies provider output through restricted evidence/concept tools; configure its selected vision/pattern models and run Product 0 with a real image plus actual 5.5-inch ring/fitting/bulb evidence. Human approval and physical test evidence remain mandatory.
 Next ready ticket: Ticket 17 remains IN_PROGRESS; Ticket 19 needs live Product 0 evidence before it can be DONE.
+
+Ticket 20 / 2026-11-05:
+Implementation outcome: Added deterministic geometry-preview artifacts from current confirmed frame/bulb data and declared stitch-surface values. The service stores a versioned `.glb` shade/bulb-envelope preview and JSON report with aperture/open-area estimate and clearance map. Calibration status is explicit: uncalibrated concept, swatch-calibrated prototype, or geometry compared with a physical sample.
+Files changed: geometry preview builder/tests, artifact storage adapters, tool service/contracts/MCP registry, workflow and ticket ledger.
+Checks actually executed and results: `npm test` — 57 passed, 0 failed, 1 skipped without a database URL; `git diff --check` — clean.
+Mock / real integration / physical evidence: Geometry is a deterministic envelope prediction only. It is not a yarn simulation, CAD export, thermal model, Cycles render or safety certification. No swatch or completed physical shade was tested.
+Commit (if created): pending.
+Remaining gate or decision: Hermes must provide deliberate stitch-surface inputs from the pattern engineer; it must not infer precise aperture dimensions from a concept image. Swatch calibration and physical comparison are needed before relying on the preview for fit decisions.
+Next ready ticket: Ticket 17 remains IN_PROGRESS; Ticket 20 needs a real Product 0 swatch and physical comparison before it can be DONE.

@@ -49,7 +49,7 @@ async function confirmMeasurements(service, projectId, { expectedVersion = 0, me
 
 async function confirmGeometry(service, projectId) {
   const evidence = { classification: "inferred_draft_only", observations: ["clear_photo", "known_ring_size", "partially_visible_stitch_pattern"], limitations: ["Back attachment is not visible."] };
-  const geometry = { frame: { topRingInnerDiameterCm: 14, bottomRingInnerDiameterCm: 20, shadeHeightCm: 18, fittingDescription: "centred E27 frame" }, bulb: { identity: "LED globe", maxDiameterCm: 6, radialOffsetCm: 0, topRelativeToTopRingCm: 2 }, manufacturerInstructionsAcknowledged: true };
+  const geometry = { frame: { topRingInnerDiameterCm: 14, bottomRingInnerDiameterCm: 20, shadeHeightCm: 18, fittingDescription: "centred E27 frame" }, bulb: { identity: "LED globe", maxDiameterCm: 6, heightCm: 10, radialOffsetCm: 0, topRelativeToTopRingCm: 2 }, manufacturerInstructionsAcknowledged: true };
   await service.call("save_reference_evidence", { project_id: projectId, evidence });
   const approval = await service.call("prepare_approval", { project_id: projectId, operation: "confirm_geometry", subject: { project_id: projectId, geometry } });
   await service.approve_gateway_callback({ project_id: projectId, callback_data: approval.callback_data, actor_id: "101", chat_id: "chat-101" });
@@ -141,6 +141,16 @@ test("accepts Hermes-generated concepts without a provider adapter", async () =>
   await confirmGeometry(service, project.project_id);
   const saved = await service.call("save_concept_options", { project_id: project.project_id, provider: "openai", model: "gpt-image-2.5-flare", concepts: [{ id: "lace-1", title: "Open lace", description: "A realistic open crochet lampshade concept.", likely_construction: "Measured open-repeat shell bands.", image_path: "private://concept/lace-1.png" }] });
   assert.equal(saved.concepts[0].illustrationLabel, "Visual concept only — not a measured crochet pattern.");
+});
+
+test("builds retrievable calibrated geometry artifacts from measured inputs", async () => {
+  const service = await makeService();
+  const project = await createProject(service);
+  await confirmGeometry(service, project.project_id);
+  const preview = await service.call("build_geometry_preview", { project_id: project.project_id, geometry_version: 1, stitch_surface: { stitchesAround: 72, rows: 20, rowHeightCm: 0.8, repeatStitches: 12, calibration: "swatch_calibrated", apertures: [{ widthCm: 0.5, heightCm: 0.8, count: 48 }] } });
+  assert.equal(preview.status, "CALIBRATED_DIGITAL_PROTOTYPE");
+  const artifact = await service.call("get_geometry_preview", { project_id: project.project_id, preview_id: preview.preview_id });
+  assert.equal(Buffer.from(artifact.glb_content_base64, "base64").subarray(0, 4).toString(), "glTF");
 });
 
 test("renders and retrieves a labelled tester PDF artifact", async () => {

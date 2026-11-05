@@ -38,6 +38,13 @@
 4. The geometry report calculates available side clearance from measured ring inner diameter, bulb maximum diameter and measured radial offset. It records top clearance from the actual bulb/fitting position. A 5.5-inch top ring therefore does not imply any generic clearance promise.
 5. Fixture and bulb manufacturer instructions override all generic prototype targets.
 
+## Geometry preview protocol
+
+1. `build_geometry_preview` accepts only confirmed geometry and a declared stitch surface: stitches around, rows, row height, aperture dimensions/counts and calibration status.
+2. It writes a versioned `.glb` frame/bulb-envelope preview and a report containing aperture area, open-area estimate and clearance map.
+3. Labels are fixed: `UNCALIBRATED_DIGITAL_CONCEPT`, `CALIBRATED_DIGITAL_PROTOTYPE`, or `PHYSICALLY_VERIFIED_PROTOTYPE`. The last label means geometry was compared with a completed sample; it is not a safety certification.
+4. This v1 renderer is deterministic geometry, not a yarn simulation, CAD export, thermal model or Cycles render. A real swatch and supervised prototype check remain required.
+
 For a drum frame:
 
 1. Calculate frame circumference as `π × diameter_cm`.

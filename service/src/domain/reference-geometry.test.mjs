@@ -7,7 +7,7 @@ test("requires evidence before accepting high-confidence conversion", () => {
 });
 
 test("calculates clearance only from actual measured geometry", () => {
-  const result = validateGeometrySpec({ frame: { topRingInnerDiameterCm: 14, bottomRingInnerDiameterCm: 20, shadeHeightCm: 18, fittingDescription: "centred E27 frame" }, bulb: { identity: "LED globe", maxDiameterCm: 6, radialOffsetCm: 0, topRelativeToTopRingCm: 2 }, manufacturerInstructionsAcknowledged: true });
+  const result = validateGeometrySpec({ frame: { topRingInnerDiameterCm: 14, bottomRingInnerDiameterCm: 20, shadeHeightCm: 18, fittingDescription: "centred E27 frame" }, bulb: { identity: "LED globe", maxDiameterCm: 6, heightCm: 10, radialOffsetCm: 0, topRelativeToTopRingCm: 2 }, manufacturerInstructionsAcknowledged: true });
   assert.equal(result.calculated.sideClearanceCm, 4);
   assert.equal(result.lighting.powerWatts.maximum, 8);
 });

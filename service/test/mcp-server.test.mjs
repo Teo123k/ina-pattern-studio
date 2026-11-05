@@ -19,6 +19,7 @@ test("MCP server exposes exactly the approved INA tools", async () => {
     assert.deepEqual(names, [
       "add_material_option",
       "approve_release",
+      "build_geometry_preview",
       "cancel_job",
       "check_release_gate",
       "create_etsy_draft",
@@ -29,6 +30,7 @@ test("MCP server exposes exactly the approved INA tools", async () => {
       "find_material_options",
       "generate_concepts",
       "generate_content_package",
+      "get_geometry_preview",
       "get_job",
       "get_pattern_pdf",
       "get_project",
